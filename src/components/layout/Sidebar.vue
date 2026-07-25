@@ -12,6 +12,7 @@ const nav_items = [
   { path: '/config', label: '配置', icon: 'lucide:settings-2', admin_only: true },
   { path: '/logs', label: '日志', icon: 'lucide:scroll-text', admin_only: false },
   { path: '/plugins', label: '插件', icon: 'lucide:puzzle', admin_only: false },
+  { path: '/adapters', label: '适配器', icon: 'lucide:unplug', admin_only: false },
   { path: '/users', label: '用户', icon: 'lucide:shield-check', admin_only: true },
 ]
 </script>

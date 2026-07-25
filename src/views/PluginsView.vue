@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { usePluginStore } from '@/stores/plugin'
@@ -16,11 +16,13 @@ import Spinner from '@/components/ui/Spinner.vue'
 const plugin_store = usePluginStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
-const { installed_list, market_items, loading, market_loading } = storeToRefs(plugin_store)
+const { installed_list, registered_plugin_modules, market_items, loading, market_loading } =
+  storeToRefs(plugin_store)
 
 const active_tab = ref('installed')
 const market_keyword = ref('')
 const toggling = ref('')
+const removing_item = ref('')
 
 const tabs = [
   { value: 'installed', label: '已安装', icon: 'lucide:puzzle' },
@@ -31,6 +33,7 @@ const type_labels = { builtin: '内置插件', dependency: '依赖插件', exter
 
 onMounted(() => {
   refresh_installed()
+  plugin_store.fetch_registered_plugins().catch(() => {})
   search_market()
 })
 
@@ -58,6 +61,22 @@ async function toggle_plugin(plugin, enabled) {
   }
 }
 
+function can_remove_plugin(plugin) {
+  return registered_plugin_modules.value.includes(plugin.module_name)
+}
+
+async function remove_plugin(plugin) {
+  removing_item.value = plugin.module_name
+  try {
+    await plugin_store.remove_plugin(plugin.module_name)
+    toast.success(`${plugin.display_name || plugin.name} 已删除，重启后生效`)
+  } catch (error) {
+    toast.error(error.message || '删除插件失败')
+  } finally {
+    removing_item.value = ''
+  }
+}
+
 async function search_market() {
   try {
     await plugin_store.fetch_market({ keyword: market_keyword.value.trim() })
@@ -81,15 +100,11 @@ async function search_market() {
         <div v-if="loading" class="card">
           <div class="loading-block"><Spinner :size="18" /> 加载中…</div>
         </div>
-        <p v-else-if="installed_list.length === 0" class="plugin-empty-hint">
-          未发现有加载的插件
-        </p>
+        <p v-else-if="installed_list.length === 0" class="plugin-empty-hint">未发现有加载的插件</p>
         <div v-else class="plugin-grid">
           <article v-for="plugin in installed_list" :key="plugin.name" class="plugin-card card">
             <div class="plugin-head">
-              <div class="plugin-icon">
-                <Icon icon="lucide:puzzle" width="18" />
-              </div>
+              <div class="plugin-icon"><Icon icon="lucide:puzzle" width="18" /></div>
               <div class="plugin-title">
                 <h3>{{ plugin.display_name || plugin.name }}</h3>
                 <span class="plugin-name mono">{{ plugin.name }}</span>
@@ -104,11 +119,27 @@ async function search_market() {
                 <span class="mono">{{ plugin.version }}</span>
                 <span class="text-muted">· {{ plugin.author || '未知作者' }}</span>
               </div>
-              <Switch
-                :model-value="plugin.enabled"
-                :disabled="!plugin.can_disable || !auth_store.is_admin || toggling === plugin.name"
-                @update:model-value="(value) => toggle_plugin(plugin, value)"
-              />
+              <div class="plugin-actions">
+                <Switch
+                  :model-value="plugin.enabled"
+                  :disabled="
+                    !plugin.can_disable || !auth_store.is_admin || toggling === plugin.name
+                  "
+                  @update:model-value="(value) => toggle_plugin(plugin, value)"
+                />
+                <Button
+                  v-if="can_remove_plugin(plugin)"
+                  variant="ghost"
+                  size="sm"
+                  icon-only
+                  title="删除插件"
+                  :disabled="!auth_store.is_admin || Boolean(removing_item)"
+                  :loading="removing_item === plugin.module_name"
+                  @click="remove_plugin(plugin)"
+                >
+                  <Icon icon="lucide:trash-2" width="15" />
+                </Button>
+              </div>
             </div>
           </article>
         </div>
@@ -234,8 +265,10 @@ async function search_market() {
   border-top: 1px solid var(--border);
 }
 
-.plugin-meta {
+.plugin-meta,
+.plugin-actions {
   display: flex;
+  align-items: center;
   gap: var(--space-1);
   font-size: var(--text-xs);
 }

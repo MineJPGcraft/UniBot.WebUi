@@ -59,6 +59,12 @@ const router = createRouter({
           meta: { title: '插件管理' },
         },
         {
+          path: 'adapters',
+          name: 'AdaptersView',
+          component: () => import('@/views/AdaptersView.vue'),
+          meta: { title: '适配器管理' },
+        },
+        {
           path: 'users',
           name: 'UsersView',
           component: () => import('@/views/UsersView.vue'),

@@ -1,6 +1,5 @@
 /**
- * 配置 Store：Config.toml 配置值 + Schema + 差异计算与保存
- * 同时管理 .env 环境变量与 pyproject.toml 中的 NoneBot 插件/适配器
+ * 配置 Store：Config.toml 配置值、Schema 与 .env 环境变量
  */
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
@@ -21,11 +20,6 @@ export const useConfigStore = defineStore('config', () => {
   const env_draft = ref({})
   const env_loading = ref(false)
   const env_saving = ref(false)
-
-  // pyproject.toml NoneBot 配置
-  const nonebot_adapters = ref([])
-  const nonebot_plugins = ref([])
-  const nonebot_loading = ref(false)
 
   /** 草稿相对原配置的变更项：[{ key, label, old_value, new_value }] */
   const changes = computed(() => {
@@ -49,7 +43,9 @@ export const useConfigStore = defineStore('config', () => {
     for (const field of env_schema.value) {
       const old_value = env_values.value[field.key]
       const new_value = env_draft.value[field.key]
-      if (JSON.stringify(old_value ?? field.default) !== JSON.stringify(new_value ?? field.default)) {
+      if (
+        JSON.stringify(old_value ?? field.default) !== JSON.stringify(new_value ?? field.default)
+      ) {
         result.push({ key: field.key, label: field.label, old_value, new_value })
       }
     }
@@ -83,17 +79,6 @@ export const useConfigStore = defineStore('config', () => {
       env_draft.value = JSON.parse(JSON.stringify(data.values || {}))
     } finally {
       env_loading.value = false
-    }
-  }
-
-  async function fetch_nonebot() {
-    nonebot_loading.value = true
-    try {
-      const data = await http.get('/api/config/nonebot')
-      nonebot_adapters.value = data.adapters || []
-      nonebot_plugins.value = data.plugins || []
-    } finally {
-      nonebot_loading.value = false
     }
   }
 
@@ -153,30 +138,6 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  /** 添加适配器 */
-  async function add_adapter(name, module_name) {
-    await http.post('/api/config/nonebot/adapters', { name, module_name })
-    await fetch_nonebot()
-  }
-
-  /** 移除适配器 */
-  async function remove_adapter(name, module_name) {
-    await http.delete('/api/config/nonebot/adapters', { body: { name, module_name } })
-    await fetch_nonebot()
-  }
-
-  /** 添加插件 */
-  async function add_plugin(name, module_name) {
-    await http.post('/api/config/nonebot/plugins', { name, module_name })
-    await fetch_nonebot()
-  }
-
-  /** 移除插件 */
-  async function remove_plugin(name, module_name) {
-    await http.delete('/api/config/nonebot/plugins', { body: { name, module_name } })
-    await fetch_nonebot()
-  }
-
   return {
     config_data,
     schema,
@@ -202,14 +163,5 @@ export const useConfigStore = defineStore('config', () => {
     update_env_field,
     reset_env_draft,
     save_env_changes,
-    // nonebot
-    nonebot_adapters,
-    nonebot_plugins,
-    nonebot_loading,
-    fetch_nonebot,
-    add_adapter,
-    remove_adapter,
-    add_plugin,
-    remove_plugin,
   }
 })

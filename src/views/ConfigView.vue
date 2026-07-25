@@ -7,6 +7,7 @@ import { use_toast } from '@/composables/use_toast'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
+import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -29,9 +30,6 @@ const {
   env_saving,
   env_changes,
   has_env_changes,
-  nonebot_adapters,
-  nonebot_plugins,
-  nonebot_loading,
 } = storeToRefs(config_store)
 
 const active_tab = ref('toml')
@@ -39,15 +37,13 @@ const active_group = ref('')
 const active_env_group = ref('')
 const diff_open = ref(false)
 const env_diff_open = ref(false)
-
-// 添加适配器/插件的表单
-const adapter_form = ref({ name: '', module_name: '' })
-const plugin_form = ref({ name: '', module_name: '' })
+const json_errors = ref({})
+const platform_item_ids = ref({})
+let platform_item_sequence = 0
 
 const tabs = [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
   { value: 'env', label: '环境变量', icon: 'lucide:terminal' },
-  { value: 'nonebot', label: '插件与适配器', icon: 'lucide:puzzle' },
 ]
 
 const groups = computed(() => schema.value?.groups || [])
@@ -60,7 +56,6 @@ onMounted(async () => {
     toast.error(error.message || '获取配置失败')
   }
   config_store.fetch_env().catch(() => {})
-  config_store.fetch_nonebot().catch(() => {})
   if (env_groups.value.length > 0) active_env_group.value = env_groups.value[0].name
 })
 
@@ -106,6 +101,55 @@ function remove_list_item(key, index) {
   handle_update(key, current)
 }
 
+function platform_item_key(key, index) {
+  const item_ids = platform_item_ids.value[key] || []
+  while (item_ids.length <= index) {
+    platform_item_sequence += 1
+    item_ids.push(`${key}-${platform_item_sequence}`)
+  }
+  platform_item_ids.value[key] = item_ids
+  return item_ids[index]
+}
+
+function split_platform_item(item, fallback = '') {
+  const separator = String(item || '').indexOf(':')
+  if (separator < 0) return { platform: fallback, target: String(item || '') }
+  return { platform: item.slice(0, separator), target: item.slice(separator + 1) }
+}
+
+function add_platform_item(field) {
+  const platform = field.options?.[0]?.value || ''
+  handle_update(field.key, [...(draft_value(field.key) || []), `${platform}:`])
+}
+
+function remove_platform_item(key, index) {
+  const item_ids = platform_item_ids.value[key] || []
+  item_ids.splice(index, 1)
+  platform_item_ids.value[key] = item_ids
+  remove_list_item(key, index)
+}
+
+function update_platform_item(field, index, property, value) {
+  const current = [...(draft_value(field.key) || [])]
+  const item = split_platform_item(current[index], field.options?.[0]?.value || '')
+  item[property] = value
+  current[index] = `${item.platform}:${item.target}`
+  handle_update(field.key, current)
+}
+
+function json_value(key) {
+  return JSON.stringify(env_draft_value(key) ?? [], null, 2)
+}
+
+function handle_json_update(key, value) {
+  try {
+    handle_env_update(key, JSON.parse(value))
+    json_errors.value = { ...json_errors.value, [key]: '' }
+  } catch {
+    json_errors.value = { ...json_errors.value, [key]: '请输入有效的 JSON' }
+  }
+}
+
 function keyword_entries(key) {
   return Object.entries(draft_value(key) || {}).map(([reply, keywords]) => ({ reply, keywords }))
 }
@@ -113,10 +157,7 @@ function keyword_entries(key) {
 function update_keyword_entry(key, entry_index, property, value) {
   const entries = keyword_entries(key)
   entries[entry_index][property] = value
-  handle_update(
-    key,
-    Object.fromEntries(entries.map((entry) => [entry.reply, entry.keywords])),
-  )
+  handle_update(key, Object.fromEntries(entries.map((entry) => [entry.reply, entry.keywords])))
 }
 
 function add_keyword_entry(key) {
@@ -175,52 +216,6 @@ async function confirm_env_save() {
     toast.error(error.message || '保存失败')
   }
 }
-
-async function submit_add_adapter() {
-  if (!adapter_form.value.name || !adapter_form.value.module_name) {
-    toast.error('请填写适配器名称和模块路径')
-    return
-  }
-  try {
-    await config_store.add_adapter(adapter_form.value.name, adapter_form.value.module_name)
-    toast.success('适配器已添加，重启后生效')
-    adapter_form.value = { name: '', module_name: '' }
-  } catch (error) {
-    toast.error(error.message || '添加失败')
-  }
-}
-
-async function submit_remove_adapter(adapter) {
-  try {
-    await config_store.remove_adapter(adapter.name, adapter.module_name)
-    toast.success('适配器已移除，重启后生效')
-  } catch (error) {
-    toast.error(error.message || '移除失败')
-  }
-}
-
-async function submit_add_plugin() {
-  if (!plugin_form.value.module_name) {
-    toast.error('请填写插件模块路径')
-    return
-  }
-  try {
-    await config_store.add_plugin(plugin_form.value.name || plugin_form.value.module_name, plugin_form.value.module_name)
-    toast.success('插件已添加，重启后生效')
-    plugin_form.value = { name: '', module_name: '' }
-  } catch (error) {
-    toast.error(error.message || '添加失败')
-  }
-}
-
-async function submit_remove_plugin(plugin) {
-  try {
-    await config_store.remove_plugin(plugin.module_name, plugin.module_name)
-    toast.success('插件已移除，重启后生效')
-  } catch (error) {
-    toast.error(error.message || '移除失败')
-  }
-}
 </script>
 
 <template>
@@ -228,7 +223,7 @@ async function submit_remove_plugin(plugin) {
     <div class="page-header">
       <div>
         <h1 class="page-title">配置中心</h1>
-        <p class="page-desc">管理 Config.toml、环境变量与 NoneBot 插件/适配器</p>
+        <p class="page-desc">管理 Config.toml 与环境变量</p>
       </div>
     </div>
 
@@ -273,7 +268,9 @@ async function submit_remove_plugin(plugin) {
             </div>
             <div class="field-list">
               <div
-                v-for="field in fields_of(groups.find((g) => g.name === active_group) || { keys: [] })"
+                v-for="field in fields_of(
+                  groups.find((g) => g.name === active_group) || { keys: [] },
+                )"
                 :key="field.key"
                 class="field-row"
                 :class="{ 'field-row--changed': changes.some((c) => c.key === field.key) }"
@@ -334,6 +331,40 @@ async function submit_remove_plugin(plugin) {
                       添加一项
                     </Button>
                   </div>
+                  <div v-else-if="field.type === 'platform_list'" class="list-editor">
+                    <div
+                      v-for="(item, index) in draft_value(field.key) || []"
+                      :key="platform_item_key(field.key, index)"
+                      class="platform-list-item"
+                    >
+                      <Select
+                        :model-value="split_platform_item(item, field.options?.[0]?.value).platform"
+                        :options="field.options || []"
+                        @update:model-value="
+                          (value) => update_platform_item(field, index, 'platform', value)
+                        "
+                      />
+                      <Input
+                        :model-value="split_platform_item(item).target"
+                        placeholder="群组 / 频道 ID"
+                        @update:model-value="
+                          (value) => update_platform_item(field, index, 'target', value)
+                        "
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon-only
+                        @click="remove_platform_item(field.key, index)"
+                      >
+                        <Icon icon="lucide:x" width="14" />
+                      </Button>
+                    </div>
+                    <Button variant="secondary" size="sm" @click="add_platform_item(field)">
+                      <Icon icon="lucide:plus" width="13" />
+                      添加群组
+                    </Button>
+                  </div>
                   <div v-else-if="field.type === 'keyword_map'" class="keyword-editor">
                     <div
                       v-for="(entry, entry_index) in keyword_entries(field.key)"
@@ -343,12 +374,25 @@ async function submit_remove_plugin(plugin) {
                       <Input
                         :model-value="entry.reply"
                         placeholder="回复内容"
-                        @update:model-value="(value) => update_keyword_entry(field.key, entry_index, 'reply', value)"
+                        @update:model-value="
+                          (value) => update_keyword_entry(field.key, entry_index, 'reply', value)
+                        "
                       />
                       <Input
                         :model-value="entry.keywords.join(', ')"
                         placeholder="关键词，用逗号分隔"
-                        @update:model-value="(value) => update_keyword_entry(field.key, entry_index, 'keywords', value.split(',').map((item) => item.trim()).filter(Boolean))"
+                        @update:model-value="
+                          (value) =>
+                            update_keyword_entry(
+                              field.key,
+                              entry_index,
+                              'keywords',
+                              value
+                                .split(',')
+                                .map((item) => item.trim())
+                                .filter(Boolean),
+                            )
+                        "
                       />
                       <Button
                         variant="ghost"
@@ -379,7 +423,11 @@ async function submit_remove_plugin(plugin) {
       <!-- 环境变量 -->
       <template #env>
         <div class="tab-actions">
-          <Button variant="ghost" :disabled="!has_env_changes" @click="config_store.reset_env_draft()">
+          <Button
+            variant="ghost"
+            :disabled="!has_env_changes"
+            @click="config_store.reset_env_draft()"
+          >
             撤销修改
           </Button>
           <Button variant="primary" :disabled="!has_env_changes" @click="env_diff_open = true">
@@ -417,7 +465,9 @@ async function submit_remove_plugin(plugin) {
             </div>
             <div class="field-list">
               <div
-                v-for="field in env_fields_of(env_groups.find((g) => g.name === active_env_group) || { keys: [] })"
+                v-for="field in env_fields_of(
+                  env_groups.find((g) => g.name === active_env_group) || { keys: [] },
+                )"
                 :key="field.key"
                 class="field-row"
                 :class="{ 'field-row--changed': env_changes.some((c) => c.key === field.key) }"
@@ -452,7 +502,9 @@ async function submit_remove_plugin(plugin) {
                     >
                       <Input
                         :model-value="item"
-                        @update:model-value="(value) => update_env_list_item(field.key, index, value)"
+                        @update:model-value="
+                          (value) => update_env_list_item(field.key, index, value)
+                        "
                       />
                       <Button
                         variant="ghost"
@@ -468,6 +520,16 @@ async function submit_remove_plugin(plugin) {
                       添加一项
                     </Button>
                   </div>
+                  <div v-else-if="field.type === 'json'" class="json-editor">
+                    <Textarea
+                      :model-value="json_value(field.key)"
+                      :rows="6"
+                      @update:model-value="(value) => handle_json_update(field.key, value)"
+                    />
+                    <span v-if="json_errors[field.key]" class="json-error">{{
+                      json_errors[field.key]
+                    }}</span>
+                  </div>
                   <Input
                     v-else
                     :model-value="env_draft_value(field.key) ?? ''"
@@ -477,74 +539,6 @@ async function submit_remove_plugin(plugin) {
               </div>
             </div>
           </section>
-        </div>
-      </template>
-
-      <!-- 插件与适配器 -->
-      <template #nonebot>
-        <div v-if="nonebot_loading" class="card">
-          <div class="loading-block"><Spinner :size="18" /> 加载中…</div>
-        </div>
-
-        <div v-else class="nonebot-sections">
-          <!-- 适配器 -->
-          <section class="card">
-            <div class="card-header">
-              <h3 class="card-title">已注册适配器</h3>
-            </div>
-            <div class="card-body">
-              <ul class="nonebot-list">
-                <li v-for="adapter in nonebot_adapters" :key="adapter.module_name" class="nonebot-item">
-                  <div class="nonebot-item-info">
-                    <span class="nonebot-item-name">{{ adapter.name }}</span>
-                    <span class="mono text-xs text-muted">{{ adapter.module_name }}</span>
-                  </div>
-                  <Button variant="ghost" size="sm" icon-only @click="submit_remove_adapter(adapter)">
-                    <Icon icon="lucide:trash-2" width="14" />
-                  </Button>
-                </li>
-                <li v-if="nonebot_adapters.length === 0" class="nonebot-empty">暂无适配器</li>
-              </ul>
-              <form class="nonebot-add-form" @submit.prevent="submit_add_adapter">
-                <Input v-model="adapter_form.name" placeholder="名称（如 Minecraft）" />
-                <Input v-model="adapter_form.module_name" placeholder="模块路径（如 nonebot.adapters.minecraft）" />
-                <Button variant="secondary" type="submit">
-                  <Icon icon="lucide:plus" width="14" />
-                  添加
-                </Button>
-              </form>
-            </div>
-          </section>
-
-          <!-- 插件 -->
-          <section class="card">
-            <div class="card-header">
-              <h3 class="card-title">已注册插件</h3>
-            </div>
-            <div class="card-body">
-              <ul class="nonebot-list">
-                <li v-for="plugin in nonebot_plugins" :key="plugin.module_name" class="nonebot-item">
-                  <div class="nonebot-item-info">
-                    <span class="mono">{{ plugin.module_name }}</span>
-                    <span class="text-xs text-muted">{{ plugin.enabled ? '已启用' : '已禁用' }}</span>
-                  </div>
-                  <Button variant="ghost" size="sm" icon-only @click="submit_remove_plugin(plugin)">
-                    <Icon icon="lucide:trash-2" width="14" />
-                  </Button>
-                </li>
-                <li v-if="nonebot_plugins.length === 0" class="nonebot-empty">暂无通过 pyproject.toml 注册的插件</li>
-              </ul>
-              <form class="nonebot-add-form" @submit.prevent="submit_add_plugin">
-                <Input v-model="plugin_form.module_name" placeholder="插件模块路径（如 nonebot_plugin_xxx）" />
-                <Button variant="secondary" type="submit">
-                  <Icon icon="lucide:plus" width="14" />
-                  添加
-                </Button>
-              </form>
-            </div>
-          </section>
-
-          <p class="text-xs text-muted">修改 pyproject.toml 后需重启机器人生效，新增插件/适配器需先通过 uv 安装依赖。</p>
         </div>
       </template>
     </Tabs>
@@ -733,6 +727,29 @@ async function submit_remove_plugin(plugin) {
   width: 100%;
 }
 
+.platform-list-item {
+  display: grid;
+  grid-template-columns: 132px 1fr auto;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.platform-list-item :deep(.ui-select-trigger) {
+  width: 100%;
+  min-width: 0;
+}
+
+.json-editor {
+  width: 100%;
+}
+
+.json-error {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
 .keyword-editor {
   width: 100%;
   display: flex;
@@ -815,54 +832,9 @@ async function submit_remove_plugin(plugin) {
   margin: var(--space-4) 0;
 }
 
-/* NoneBot 插件/适配器管理 */
-.nonebot-sections {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
-.nonebot-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.nonebot-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.nonebot-item:last-child {
-  border-bottom: none;
-}
-
-.nonebot-item-info {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.nonebot-item-name {
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.nonebot-empty {
-  padding: var(--space-4) 0;
-  text-align: center;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.nonebot-add-form {
-  display: flex;
-  gap: var(--space-2);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border);
-  margin-top: var(--space-2);
+@media (max-width: 700px) {
+  .platform-list-item {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
