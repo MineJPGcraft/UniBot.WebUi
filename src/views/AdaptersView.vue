@@ -7,9 +7,9 @@ import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Checkbox from '@/components/ui/Checkbox.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import Switch from '@/components/ui/Switch.vue'
 
 const adapter_store = useAdapterStore()
 const auth_store = useAuthStore()
@@ -17,10 +17,10 @@ const toast = use_toast()
 const { registered_list, catalog, loading } = storeToRefs(adapter_store)
 
 const installing_adapter = ref('')
-const removing_adapter = ref('')
-const remove_dialog_open = ref(false)
-const pending_removal = ref(null)
-const remove_dependency = ref(false)
+const toggling_adapter = ref('')
+const uninstalling_adapter = ref('')
+const uninstall_dialog_open = ref(false)
+const pending_uninstall = ref(null)
 
 const adapter_items = computed(() => {
   const catalog_modules = new Set(catalog.value.map((adapter) => adapter.module_name))
@@ -58,29 +58,36 @@ async function install_adapter(adapter) {
   }
 }
 
-function confirm_remove(adapter) {
-  pending_removal.value = adapter
-  remove_dependency.value = false
-  remove_dialog_open.value = true
+async function toggle_adapter(adapter, enabled) {
+  toggling_adapter.value = adapter.id
+  try {
+    await adapter_store.toggle_register(adapter.name, adapter.module_name, enabled)
+    toast.success(enabled ? `${adapter.name} 已启用（重启后生效）` : `${adapter.name} 已禁用（重启后生效）`)
+  } catch (error) {
+    toast.error(error.message || '操作失败')
+  } finally {
+    toggling_adapter.value = ''
+  }
 }
 
-async function remove_adapter() {
-  const adapter = pending_removal.value
+function confirm_uninstall(adapter) {
+  pending_uninstall.value = adapter
+  uninstall_dialog_open.value = true
+}
+
+async function do_uninstall() {
+  const adapter = pending_uninstall.value
   if (!adapter) return
-  removing_adapter.value = adapter.module_name
+  uninstalling_adapter.value = adapter.module_name
   try {
-    await adapter_store.remove(adapter.name, adapter.module_name, remove_dependency.value)
-    toast.success(
-      remove_dependency.value
-        ? `${adapter.name} 及其依赖已删除，重启后生效`
-        : `${adapter.name} 已取消注册，重启后生效`,
-    )
-    remove_dialog_open.value = false
-    pending_removal.value = null
+    await adapter_store.uninstall(adapter.name, adapter.module_name)
+    toast.success(`${adapter.name} 及其依赖已彻底删除（重启后生效）`)
+    uninstall_dialog_open.value = false
+    pending_uninstall.value = null
   } catch (error) {
-    toast.error(error.message || '删除适配器失败')
+    toast.error(error.message || '卸载失败')
   } finally {
-    removing_adapter.value = ''
+    uninstalling_adapter.value = ''
   }
 }
 </script>
@@ -90,7 +97,7 @@ async function remove_adapter() {
     <div class="page-header">
       <div>
         <h1 class="page-title">适配器管理</h1>
-        <p class="page-desc">安装或移除 NoneBot 平台适配器</p>
+        <p class="page-desc">安装、启用或卸载 NoneBot 平台适配器</p>
       </div>
     </div>
 
@@ -103,8 +110,8 @@ async function remove_adapter() {
           <div class="adapter-main">
             <div class="adapter-title">
               <h3>{{ adapter.name }}</h3>
-              <Badge :variant="adapter.registered ? 'success' : 'neutral'">
-                {{ adapter.registered ? '已注册' : '未安装' }}
+              <Badge :variant="adapter.registered ? 'success' : adapter.installed ? 'warning' : 'neutral'">
+                {{ adapter.registered ? '已启用' : adapter.installed ? '已禁用' : '未安装' }}
               </Badge>
             </div>
             <span class="adapter-package mono">{{ adapter.package || adapter.module_name }}</span>
@@ -114,59 +121,61 @@ async function remove_adapter() {
             <span v-for="platform in adapter.platforms || []" :key="platform">{{ platform }}</span>
           </div>
           <div class="adapter-actions">
-            <span
-              v-if="adapter.registered && adapter.removable === false"
-              class="protected-adapter"
-              title="核心适配器，禁止卸载"
-            >
-              <Icon icon="lucide:lock-keyhole" width="15" />
-              内置
-            </span>
-            <Button
-              v-else-if="adapter.registered"
-              variant="ghost"
-              size="sm"
-              icon-only
-              title="删除适配器"
-              :disabled="!auth_store.is_admin || Boolean(removing_adapter)"
-              :loading="removing_adapter === adapter.module_name"
-              @click="confirm_remove(adapter)"
-            >
-              <Icon icon="lucide:trash-2" width="15" />
-            </Button>
-            <Button
-              v-else
-              variant="secondary"
-              size="sm"
-              :disabled="!auth_store.is_admin || Boolean(installing_adapter)"
-              :loading="installing_adapter === adapter.id"
-              @click="install_adapter(adapter)"
-            >
-              <Icon icon="lucide:download" width="14" />
-              安装
-            </Button>
+            <template v-if="adapter.removable === false">
+              <span class="protected-adapter" title="核心适配器，禁止操作">
+                <Icon icon="lucide:lock-keyhole" width="15" />
+                内置
+              </span>
+            </template>
+            <template v-else-if="adapter.installed">
+              <Switch
+                :model-value="adapter.registered"
+                :disabled="!auth_store.is_admin || toggling_adapter === adapter.id"
+                @update:model-value="(val) => toggle_adapter(adapter, val)"
+                :title="adapter.registered ? '禁用后将取消注册（依赖不删除）' : '启用后将重新注册'"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                icon-only
+                title="彻底删除（取消注册并删除依赖）"
+                :disabled="!auth_store.is_admin || Boolean(uninstalling_adapter)"
+                :loading="uninstalling_adapter === adapter.module_name"
+                @click="confirm_uninstall(adapter)"
+              >
+                <Icon icon="lucide:trash-2" width="15" />
+              </Button>
+            </template>
+            <template v-else>
+              <Button
+                variant="secondary"
+                size="sm"
+                :disabled="!auth_store.is_admin || Boolean(installing_adapter)"
+                :loading="installing_adapter === adapter.id"
+                @click="install_adapter(adapter)"
+              >
+                <Icon icon="lucide:download" width="14" />
+                安装
+              </Button>
+            </template>
           </div>
         </li>
       </ul>
     </section>
 
     <Dialog
-      v-model="remove_dialog_open"
-      title="删除适配器"
-      :description="`确定删除 ${pending_removal?.name || ''} 吗？`"
-      confirm-text="删除"
+      v-model="uninstall_dialog_open"
+      title="彻底删除适配器"
+      :description="`确定彻底删除 ${pending_uninstall?.name || ''} 吗？这将取消注册并删除依赖包，不可恢复。`"
+      confirm-text="彻底删除"
       confirm-variant="danger"
-      :loading="Boolean(removing_adapter)"
-      @confirm="remove_adapter"
+      :loading="Boolean(uninstalling_adapter)"
+      @confirm="do_uninstall"
     >
-      <label v-if="pending_removal?.package" class="dependency-option">
-        <Checkbox v-model="remove_dependency" :disabled="Boolean(removing_adapter)" />
-        <span>
-          <strong>同时删除依赖库</strong>
-          <small class="mono">{{ pending_removal.package }}</small>
-        </span>
-      </label>
-      <p v-else class="dependency-unavailable">该适配器不是从内置目录安装，只会取消注册。</p>
+      <p class="uninstall-warning">
+        <Icon icon="lucide:alert-triangle" width="16" />
+        此操作将同时从 pyproject.toml 中移除注册信息和依赖，如需再次使用需重新安装。
+      </p>
     </Dialog>
   </div>
 </template>
@@ -254,7 +263,9 @@ async function remove_adapter() {
 
 .adapter-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .protected-adapter {
@@ -265,53 +276,14 @@ async function remove_adapter() {
   font-size: var(--text-xs);
 }
 
-.dependency-option {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-subtle);
-  cursor: pointer;
-  transition:
-    border-color var(--transition),
-    background-color var(--transition);
-}
-
-.dependency-option:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-}
-
-.dependency-option > :first-child {
-  margin-top: 2px;
-}
-
-.dependency-option span {
+.uninstall-warning {
   display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--space-1);
-}
-
-.dependency-option strong {
-  line-height: 20px;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.dependency-option small,
-.dependency-unavailable {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-}
-
-.dependency-option small {
-  overflow: hidden;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

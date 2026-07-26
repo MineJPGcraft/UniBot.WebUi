@@ -27,9 +27,18 @@ export const useAdapterStore = defineStore('adapter', () => {
     return result
   }
 
-  async function remove(name, module_name, remove_dependency = false) {
-    await http.delete('/api/config/nonebot/adapters', {
-      body: { name, module_name, remove_dependency },
+  async function toggle_register(name, module_name, register) {
+    if (register) {
+      await http.post('/api/config/nonebot/adapters', { name, module_name })
+    } else {
+      await http.delete('/api/config/nonebot/adapters', { body: { name, module_name } })
+    }
+    await fetch_all()
+  }
+
+  async function uninstall(name, module_name) {
+    await http.delete('/api/config/nonebot/adapters/uninstall', {
+      body: { name, module_name },
     })
     await fetch_all()
   }
@@ -40,6 +49,7 @@ export const useAdapterStore = defineStore('adapter', () => {
     loading,
     fetch_all,
     install,
-    remove,
+    toggle_register,
+    uninstall,
   }
 })
