@@ -63,5 +63,6 @@ onUnmounted(() => {
 .app-content {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 </style>

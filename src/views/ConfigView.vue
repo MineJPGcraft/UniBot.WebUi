@@ -57,8 +57,12 @@ onMounted(async () => {
   } catch (error) {
     toast.error(error.message || '获取配置失败')
   }
-  config_store.fetch_env().catch(() => {})
-  if (env_groups.value.length > 0) active_env_group.value = env_groups.value[0].name
+  try {
+    await config_store.fetch_env()
+    if (env_groups.value.length > 0) active_env_group.value = env_groups.value[0].name
+  } catch {
+    // 环境变量加载失败不阻塞页面
+  }
 })
 
 function fields_of(group) {
