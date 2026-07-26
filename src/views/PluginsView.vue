@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { usePluginStore } from '@/stores/plugin'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_restart } from '@/composables/use_restart'
 import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -16,6 +17,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 const plugin_store = usePluginStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { ask_restart } = use_restart()
 const { installed_list, registered_plugin_modules, market_items, loading, market_loading } =
   storeToRefs(plugin_store)
 
@@ -54,6 +56,9 @@ async function toggle_plugin(plugin, enabled) {
         ? `已启用 ${plugin.display_name || plugin.name}`
         : `已禁用 ${plugin.display_name || plugin.name}`,
     )
+    ask_restart(
+      `插件 ${plugin.display_name || plugin.name} 的启停需要重启机器人生效，是否立即重启？`,
+    )
   } catch (error) {
     toast.error(error.message || '操作失败')
   } finally {
@@ -62,7 +67,7 @@ async function toggle_plugin(plugin, enabled) {
 }
 
 function can_remove_plugin(plugin) {
-  return registered_plugin_modules.value.includes(plugin.module_name)
+  return plugin.type !== 'builtin' && registered_plugin_modules.value.includes(plugin.module_name)
 }
 
 async function remove_plugin(plugin) {
@@ -70,6 +75,9 @@ async function remove_plugin(plugin) {
   try {
     await plugin_store.remove_plugin(plugin.module_name)
     toast.success(`${plugin.display_name || plugin.name} 已删除，重启后生效`)
+    ask_restart(
+      `插件 ${plugin.display_name || plugin.name} 已删除，需要重启机器人生效，是否立即重启？`,
+    )
   } catch (error) {
     toast.error(error.message || '删除插件失败')
   } finally {

@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
 import { use_toast } from '@/composables/use_toast'
+import { use_restart } from '@/composables/use_restart'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
@@ -16,6 +17,7 @@ import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
 const toast = use_toast()
+const { ask_restart } = use_restart()
 const {
   schema,
   draft,
@@ -197,11 +199,17 @@ function display_value(value) {
   return String(value)
 }
 
+const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode', 'ai.enabled']
+
 async function confirm_save() {
   try {
+    const changed_keys = changes.value.map((change) => change.key)
     await config_store.save_changes()
     toast.success('配置已保存并热更新')
     diff_open.value = false
+    if (changed_keys.some((key) => RESTART_DEPENDENT_KEYS.includes(key))) {
+      ask_restart('WebUI / 图片渲染 / AI 的启停需要重启机器人生效，是否立即重启？')
+    }
   } catch (error) {
     toast.error(error.message || '保存失败')
   }

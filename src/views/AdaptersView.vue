@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { useAdapterStore } from '@/stores/adapter'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_restart } from '@/composables/use_restart'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -14,6 +15,7 @@ import Switch from '@/components/ui/Switch.vue'
 const adapter_store = useAdapterStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { ask_restart } = use_restart()
 const { registered_list, catalog, loading } = storeToRefs(adapter_store)
 
 const installing_adapter = ref('')
@@ -51,6 +53,7 @@ async function install_adapter(adapter) {
   try {
     await adapter_store.install(adapter.id)
     toast.success(`${adapter.name} 已安装并注册，重启后生效`)
+    ask_restart(`适配器 ${adapter.name} 已安装，需要重启机器人生效，是否立即重启？`)
   } catch (error) {
     toast.error(error.message || '安装适配器失败')
   } finally {
@@ -65,6 +68,7 @@ async function toggle_adapter(adapter, enabled) {
     toast.success(
       enabled ? `${adapter.name} 已启用（重启后生效）` : `${adapter.name} 已禁用（重启后生效）`,
     )
+    ask_restart(`适配器 ${adapter.name} 的启停需要重启机器人生效，是否立即重启？`)
   } catch (error) {
     toast.error(error.message || '操作失败')
   } finally {
@@ -86,6 +90,7 @@ async function do_uninstall() {
     toast.success(`${adapter.name} 及其依赖已彻底删除（重启后生效）`)
     uninstall_dialog_open.value = false
     pending_uninstall.value = null
+    ask_restart(`适配器 ${adapter.name} 已删除，需要重启机器人生效，是否立即重启？`)
   } catch (error) {
     toast.error(error.message || '卸载失败')
   } finally {

@@ -1,16 +1,11 @@
 <script setup>
-import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
-import { use_toast } from '@/composables/use_toast'
-import { http } from '@/utils/http'
-import Dialog from '@/components/ui/Dialog.vue'
+import { use_restart } from '@/composables/use_restart'
 
 const auth_store = useAuthStore()
-const toast = use_toast()
-const restart_dialog_open = ref(false)
-const restarting = ref(false)
+const { restarting, ask_restart } = use_restart()
 
 const nav_items = [
   { path: '/', label: '仪表盘', icon: 'lucide:layout-dashboard', admin_only: false },
@@ -22,36 +17,6 @@ const nav_items = [
   { path: '/adapters', label: '适配器', icon: 'lucide:unplug', admin_only: false },
   { path: '/users', label: '用户', icon: 'lucide:shield-check', admin_only: true },
 ]
-
-async function wait_for_restart(previous_started_at) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 500))
-    try {
-      const health = await http.get('/api/status/health', { auth: false })
-      if (health.started_at !== previous_started_at) {
-        window.location.reload()
-        return
-      }
-    } catch {
-      // 服务重启期间健康检查暂时不可用。
-    }
-  }
-  restarting.value = false
-  toast.error('机器人重启超时，请稍后刷新页面')
-}
-
-async function restart_bot() {
-  restarting.value = true
-  try {
-    const previous_instance = await http.post('/api/status/restart', {})
-    restart_dialog_open.value = false
-    toast.success('机器人正在重启')
-    await wait_for_restart(previous_instance.started_at)
-  } catch (error) {
-    restarting.value = false
-    toast.error(error.message || '重启失败')
-  }
-}
 </script>
 
 <template>
@@ -71,7 +36,7 @@ async function restart_bot() {
         title="重启机器人"
         aria-label="重启机器人"
         :disabled="restarting"
-        @click="restart_dialog_open = true"
+        @click="ask_restart('当前连接会短暂中断，服务恢复后页面将自动刷新。', '确认重启机器人？')"
       >
         <Icon icon="lucide:refresh-cw" width="16" :class="{ spinning: restarting }" />
       </button>
@@ -96,16 +61,6 @@ async function restart_bot() {
         <span>个人设置</span>
       </RouterLink>
     </div>
-
-    <Dialog
-      v-model="restart_dialog_open"
-      title="确认重启机器人？"
-      description="当前连接会短暂中断，服务恢复后页面将自动刷新。"
-      confirm-text="确认重启"
-      confirm-variant="danger"
-      :loading="restarting"
-      @confirm="restart_bot"
-    />
   </aside>
 </template>
 
