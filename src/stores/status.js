@@ -20,6 +20,12 @@ export const useStatusStore = defineStore('status', () => {
     return status.value
   }
 
+  async function check_update() {
+    const data = await http.post('/api/status/check-update', {})
+    status.value = { ...status.value, ...data }
+    return data
+  }
+
   function start_polling(interval_ms = 10000) {
     stop_polling()
     poll_timer = setInterval(() => fetch_status().catch(() => {}), interval_ms)
@@ -32,5 +38,5 @@ export const useStatusStore = defineStore('status', () => {
     }
   }
 
-  return { status, loading, fetch_status, start_polling, stop_polling }
+  return { status, loading, fetch_status, check_update, start_polling, stop_polling }
 })

@@ -8,7 +8,7 @@ import { use_toast } from '@/composables/use_toast'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
-import { role_label, format_datetime } from '@/utils/format'
+import { role_label, format_datetime, format_uptime } from '@/utils/format'
 
 const auth_store = useAuthStore()
 const status_store = useStatusStore()
@@ -25,6 +25,53 @@ const saving_password = ref(false)
 const avatar_text = computed(() =>
   (user.value?.nickname || user.value?.username || '?').slice(0, 1),
 )
+
+const checking_update = ref(false)
+
+const update_hint = computed(() => {
+  if (!status.value?.latest_version) return null
+  if (status.value.has_update) {
+    return { variant: 'warning', text: `发现新版本 ${status.value.latest_version}` }
+  }
+  return { variant: 'success', text: '已是最新版本' }
+})
+
+async function check_update() {
+  checking_update.value = true
+  try {
+    await status_store.check_update()
+    if (status.value?.has_update) {
+      toast.info(`发现新版本 ${status.value.latest_version}，请及时更新`)
+    } else {
+      toast.success('当前已是最新版本')
+    }
+  } catch (error) {
+    toast.error(error.message || '检测失败')
+  } finally {
+    checking_update.value = false
+  }
+}
+
+const about_links = [
+  {
+    label: '官方网站',
+    value: 'qqbot.bugjump.xyz',
+    url: 'https://qqbot.bugjump.xyz/',
+    icon: 'lucide:globe',
+  },
+  {
+    label: '项目地址',
+    value: 'github.com/Minecraft-QQBot',
+    url: 'https://github.com/Minecraft-QQBot',
+    icon: 'lucide:github',
+  },
+  {
+    label: 'QQ 交流群',
+    value: '962802248',
+    url: 'https://qm.qq.com/q/B3kmvJl2xO',
+    icon: 'lucide:users',
+  },
+]
 
 async function save_profile() {
   if (!nickname.value.trim()) {
@@ -142,10 +189,6 @@ async function save_password() {
       </div>
       <div class="card-body session-body">
         <div class="session-row">
-          <span class="session-label">机器人版本</span>
-          <span class="mono">{{ status?.version || '—' }}</span>
-        </div>
-        <div class="session-row">
           <span class="session-label">最后登录</span>
           <span>{{ format_datetime(user?.last_login_at) }}</span>
         </div>
@@ -153,6 +196,79 @@ async function save_password() {
           <span class="session-label">access_token 有效期</span>
           <span>2 小时（过期自动刷新）</span>
         </div>
+      </div>
+    </section>
+
+    <!-- 关于 -->
+    <section class="card about-card">
+      <div class="about-banner">
+        <div class="about-banner-grid" aria-hidden="true"></div>
+        <div class="about-identity">
+          <span class="about-logo"><Icon icon="lucide:bot" width="22" /></span>
+          <div class="about-title-block">
+            <div class="about-name">
+              UniBot
+              <Badge variant="accent">{{ status?.version || '—' }}</Badge>
+            </div>
+            <p class="about-desc">一款与 Minecraft 互通的 NoneBot2 机器人</p>
+          </div>
+        </div>
+        <div class="about-banner-side">
+          <span class="about-pulse">
+            <span class="pulse-dot" />
+            已运行 {{ format_uptime(status?.uptime) }}
+          </span>
+          <button
+            v-if="auth_store.is_admin"
+            class="check-update-button"
+            type="button"
+            :disabled="checking_update"
+            @click="check_update"
+          >
+            <Icon icon="lucide:refresh-cw" width="13" :class="{ spinning: checking_update }" />
+            检测更新
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="update_hint"
+        class="about-update-bar"
+        :class="`about-update-bar--${update_hint.variant}`"
+      >
+        <Icon
+          :icon="
+            update_hint.variant === 'warning' ? 'lucide:arrow-up-circle' : 'lucide:check-circle-2'
+          "
+          width="15"
+        />
+        <span>{{ update_hint.text }}</span>
+        <a
+          v-if="update_hint.variant === 'warning'"
+          class="about-update-link"
+          href="https://github.com/Minecraft-UniBot/UniBot/releases/latest"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          前往下载
+          <Icon icon="lucide:arrow-up-right" width="13" />
+        </a>
+      </div>
+
+      <div class="card-body about-body">
+        <a
+          v-for="link in about_links"
+          :key="link.label"
+          class="about-link"
+          :href="link.url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="about-link-icon"><Icon :icon="link.icon" width="15" /></span>
+          <span class="about-link-label">{{ link.label }}</span>
+          <span class="about-link-value mono">{{ link.value }}</span>
+          <Icon class="about-link-arrow" icon="lucide:arrow-up-right" width="14" />
+        </a>
       </div>
     </section>
   </div>
@@ -258,9 +374,263 @@ async function save_password() {
   color: var(--text-muted);
 }
 
+/* 关于卡片 */
+.about-card {
+  overflow: hidden;
+}
+
+.about-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--surface) 0%, var(--accent-soft) 100%);
+  overflow: hidden;
+}
+
+.about-banner-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(105deg, transparent 25%, #000 100%);
+  pointer-events: none;
+}
+
+.about-identity {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.about-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+}
+
+.about-title-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.about-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.about-desc {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.about-pulse {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.about-banner-side {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.check-update-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  transition:
+    background-color var(--transition),
+    color var(--transition);
+}
+
+.check-update-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.check-update-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.check-update-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.about-update-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.about-update-bar--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.about-update-bar--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.about-update-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  color: inherit;
+  font-weight: 500;
+}
+
+.about-update-link:hover {
+  text-decoration: underline;
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent);
+  }
+
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.about-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+}
+
+.about-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color var(--transition);
+}
+
+a.about-link:hover {
+  background: var(--surface-sunken);
+}
+
+.about-link-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.about-link-label {
+  width: 88px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.about-link-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.about-link-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color var(--transition);
+}
+
+a.about-link:hover .about-link-arrow {
+  color: var(--accent);
+}
+
 @media (max-width: 700px) {
   .profile-body {
     grid-template-columns: 1fr;
+  }
+
+  .about-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .about-banner-side {
+    align-items: flex-start;
   }
 }
 </style>
