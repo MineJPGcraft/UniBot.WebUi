@@ -62,7 +62,9 @@ async function toggle_adapter(adapter, enabled) {
   toggling_adapter.value = adapter.id
   try {
     await adapter_store.toggle_register(adapter.name, adapter.module_name, enabled)
-    toast.success(enabled ? `${adapter.name} 已启用（重启后生效）` : `${adapter.name} 已禁用（重启后生效）`)
+    toast.success(
+      enabled ? `${adapter.name} 已启用（重启后生效）` : `${adapter.name} 已禁用（重启后生效）`,
+    )
   } catch (error) {
     toast.error(error.message || '操作失败')
   } finally {
@@ -110,7 +112,11 @@ async function do_uninstall() {
           <div class="adapter-main">
             <div class="adapter-title">
               <h3>{{ adapter.name }}</h3>
-              <Badge :variant="adapter.registered ? 'success' : adapter.installed ? 'warning' : 'neutral'">
+              <Badge
+                :variant="
+                  adapter.registered ? 'success' : adapter.installed ? 'warning' : 'neutral'
+                "
+              >
                 {{ adapter.registered ? '已启用' : adapter.installed ? '已禁用' : '未安装' }}
               </Badge>
             </div>

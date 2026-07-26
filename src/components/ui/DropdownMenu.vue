@@ -72,7 +72,6 @@ defineProps({
 </style>
 
 <style scoped>
-
 .ui-dropdown-item {
   display: flex;
   align-items: center;

@@ -1,9 +1,16 @@
 <script setup>
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
+import { use_toast } from '@/composables/use_toast'
+import { http } from '@/utils/http'
+import Dialog from '@/components/ui/Dialog.vue'
 
 const auth_store = useAuthStore()
+const toast = use_toast()
+const restart_dialog_open = ref(false)
+const restarting = ref(false)
 
 const nav_items = [
   { path: '/', label: '仪表盘', icon: 'lucide:layout-dashboard', admin_only: false },
@@ -15,6 +22,36 @@ const nav_items = [
   { path: '/adapters', label: '适配器', icon: 'lucide:unplug', admin_only: false },
   { path: '/users', label: '用户', icon: 'lucide:shield-check', admin_only: true },
 ]
+
+async function wait_for_restart(previous_started_at) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 500))
+    try {
+      const health = await http.get('/api/status/health', { auth: false })
+      if (health.started_at !== previous_started_at) {
+        window.location.reload()
+        return
+      }
+    } catch {
+      // 服务重启期间健康检查暂时不可用。
+    }
+  }
+  restarting.value = false
+  toast.error('机器人重启超时，请稍后刷新页面')
+}
+
+async function restart_bot() {
+  restarting.value = true
+  try {
+    const previous_instance = await http.post('/api/status/restart', {})
+    restart_dialog_open.value = false
+    toast.success('机器人正在重启')
+    await wait_for_restart(previous_instance.started_at)
+  } catch (error) {
+    restarting.value = false
+    toast.error(error.message || '重启失败')
+  }
+}
 </script>
 
 <template>
@@ -27,6 +64,17 @@ const nav_items = [
         <span class="brand-name">UniBot</span>
         <span class="brand-sub">控制面板</span>
       </div>
+      <button
+        v-if="auth_store.is_admin"
+        class="restart-button"
+        type="button"
+        title="重启机器人"
+        aria-label="重启机器人"
+        :disabled="restarting"
+        @click="restart_dialog_open = true"
+      >
+        <Icon icon="lucide:refresh-cw" width="16" :class="{ spinning: restarting }" />
+      </button>
     </div>
 
     <nav class="sidebar-nav">
@@ -48,6 +96,16 @@ const nav_items = [
         <span>个人设置</span>
       </RouterLink>
     </div>
+
+    <Dialog
+      v-model="restart_dialog_open"
+      title="确认重启机器人？"
+      description="当前连接会短暂中断，服务恢复后页面将自动刷新。"
+      confirm-text="确认重启"
+      confirm-variant="danger"
+      :loading="restarting"
+      @confirm="restart_bot"
+    />
   </aside>
 </template>
 
@@ -86,6 +144,8 @@ const nav_items = [
   display: flex;
   flex-direction: column;
   line-height: 1.2;
+  min-width: 0;
+  flex: 1;
 }
 
 .brand-name {
@@ -97,6 +157,49 @@ const nav_items = [
 .brand-sub {
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+.restart-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition),
+    color var(--transition);
+}
+
+.restart-button:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.restart-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.restart-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .sidebar-nav {

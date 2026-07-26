@@ -12,7 +12,7 @@ const AUTH_FLAG_KEY = 'unibot_authenticated'
 
 /** 检查是否存在登录标记 cookie */
 export function is_authenticated() {
-  return document.cookie.split('; ').some(row => row.startsWith(AUTH_FLAG_KEY + '='))
+  return document.cookie.split('; ').some((row) => row.startsWith(AUTH_FLAG_KEY + '='))
 }
 
 /** 业务错误：code !== 0 时抛出，携带 code 与 message */

@@ -6,7 +6,8 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { http } from '@/utils/http'
 
-const LOG_LINE_PATTERN = /^(?<date>\d{4}-\d{2}-\d{2})\s+(?<time>\d{2}:\d{2}:\d{2}\.\d+)\s*\|\s*(?<level>\w+)\s*\|\s*(?<module>[^-]+?)\s*-\s*(?<message>.*)$/
+const LOG_LINE_PATTERN =
+  /^(?<date>\d{4}-\d{2}-\d{2})\s+(?<time>\d{2}:\d{2}:\d{2}\.\d+)\s*\|\s*(?<level>\w+)\s*\|\s*(?<module>[^-]+?)\s*-\s*(?<message>.*)$/
 
 function parse_line(raw) {
   const match = raw.text.match(LOG_LINE_PATTERN)
@@ -62,7 +63,8 @@ export const useLogStore = defineStore('log', () => {
     if (!current_file.value) return
     loading.value = true
     try {
-      raw_lines.value = (await http.get(`/api/logs/${encodeURIComponent(current_file.value)}`)) || []
+      raw_lines.value =
+        (await http.get(`/api/logs/${encodeURIComponent(current_file.value)}`)) || []
     } finally {
       loading.value = false
     }

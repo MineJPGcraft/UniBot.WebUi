@@ -186,7 +186,10 @@ function handle_command_keydown(event) {
         </div>
         <div class="info-cell">
           <span class="info-label">JVM 内存</span>
-          <span class="info-value mono">{{ format_mb(detail?.jvm_memory_used) }} / {{ format_mb(detail?.jvm_memory_max) }}</span>
+          <span class="info-value mono"
+            >{{ format_mb(detail?.jvm_memory_used) }} /
+            {{ format_mb(detail?.jvm_memory_max) }}</span
+          >
         </div>
         <div class="info-cell info-cell--grow">
           <span class="info-label"
