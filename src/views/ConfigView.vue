@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
@@ -34,7 +35,10 @@ const {
   has_env_changes,
 } = storeToRefs(config_store)
 
-const active_tab = ref('toml')
+const route = useRoute()
+const router = useRouter()
+
+const active_tab = ref(route.query.tab === 'env' ? 'env' : 'toml')
 const active_group = ref('')
 const active_env_group = ref('')
 const diff_open = ref(false)
@@ -59,11 +63,38 @@ onMounted(async () => {
   }
   try {
     await config_store.fetch_env()
-    if (env_groups.value.length > 0) active_env_group.value = env_groups.value[0].name
+    // 优先使用 URL query 中的 key / group 定位 group；否则取第一项
+    const query_key = route.query.key
+    const query_group = route.query.group
+    let target_group = ''
+    if (typeof query_group === 'string') {
+      target_group = query_group
+    } else if (typeof query_key === 'string') {
+      const matched = env_groups.value.find((g) => g.keys.includes(query_key))
+      if (matched) target_group = matched.name
+    }
+    if (target_group && env_groups.value.some((g) => g.name === target_group)) {
+      active_env_group.value = target_group
+    } else if (env_groups.value.length > 0) {
+      active_env_group.value = env_groups.value[0].name
+    }
   } catch {
     // 环境变量加载失败不阻塞页面
   }
 })
+
+// 切换 tab / group 时同步到 URL query，便于分享与刷新保持
+watch(active_tab, (val) => sync_query({ tab: val }))
+watch(active_env_group, (val) => {
+  if (active_tab.value === 'env') sync_query({ group: val })
+})
+
+function sync_query(patch) {
+  const query = { ...route.query, ...patch }
+  // 非当前 tab 的 group 信息不保留
+  if (patch.tab && patch.tab !== 'env') delete query.group
+  router.replace({ query })
+}
 
 function fields_of(group) {
   return (schema.value?.fields || []).filter((field) => group.keys.includes(field.key))

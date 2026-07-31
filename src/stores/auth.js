@@ -37,8 +37,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    // 发送空对象作为 body，并显式声明 options；无论如何都清理本地状态。
+    // 后端会强制清空所有认证 cookie，即使请求失败也以本地登出为准。
     try {
-      await http.post('/api/auth/logout', { auth: false })
+      await http.post('/api/auth/logout', {}, { auth: false })
     } catch {
       // 登出失败也要清理本地状态
     }

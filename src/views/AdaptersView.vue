@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useAdapterStore } from '@/stores/adapter'
@@ -16,6 +17,7 @@ const adapter_store = useAdapterStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
 const { ask_restart } = use_restart()
+const router = useRouter()
 const { registered_list, catalog, loading } = storeToRefs(adapter_store)
 
 const installing_adapter = ref('')
@@ -37,7 +39,12 @@ const adapter_items = computed(() => {
       registered: true,
       removable: adapter.removable !== false,
     }))
-  return [...catalog.value, ...custom_adapters]
+  // 透传 config_keys 字段供「配置」按钮使用
+  const catalog_items = catalog.value.map((adapter) => ({
+    ...adapter,
+    config_keys: adapter.config_keys || [],
+  }))
+  return [...catalog_items, ...custom_adapters]
 })
 
 onMounted(async () => {
@@ -79,6 +86,19 @@ async function toggle_adapter(adapter, enabled) {
 function confirm_uninstall(adapter) {
   pending_uninstall.value = adapter
   uninstall_dialog_open.value = true
+}
+
+/**
+ * 跳转到该适配器对应的环境变量配置项组。
+ * 通过第一个 config_key 在 env_groups 中定位所属 group。
+ */
+function goto_adapter_config(adapter) {
+  const keys = adapter.config_keys || []
+  if (keys.length === 0) {
+    toast.info(`暂无 ${adapter.name} 的专属配置项`)
+    return
+  }
+  router.push({ name: 'ConfigView', query: { tab: 'env', key: keys[0] } })
 }
 
 async function do_uninstall() {
@@ -137,6 +157,17 @@ async function do_uninstall() {
                 <Icon icon="lucide:lock-keyhole" width="15" />
                 内置
               </span>
+              <Button
+                v-if="adapter.config_keys && adapter.config_keys.length > 0"
+                variant="ghost"
+                size="sm"
+                icon-only
+                title="配置此适配器"
+                :disabled="!auth_store.is_admin"
+                @click="goto_adapter_config(adapter)"
+              >
+                <Icon icon="lucide:settings" width="15" />
+              </Button>
             </template>
             <template v-else-if="adapter.installed">
               <Switch
@@ -145,17 +176,29 @@ async function do_uninstall() {
                 @update:model-value="(val) => toggle_adapter(adapter, val)"
                 :title="adapter.registered ? '禁用后将取消注册（依赖不删除）' : '启用后将重新注册'"
               />
-              <Button
-                variant="ghost"
-                size="sm"
-                icon-only
-                title="彻底删除（取消注册并删除依赖）"
-                :disabled="!auth_store.is_admin || Boolean(uninstalling_adapter)"
-                :loading="uninstalling_adapter === adapter.module_name"
-                @click="confirm_uninstall(adapter)"
-              >
-                <Icon icon="lucide:trash-2" width="15" />
-              </Button>
+              <div class="action-group">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon-only
+                  title="配置此适配器"
+                  :disabled="!auth_store.is_admin"
+                  @click="goto_adapter_config(adapter)"
+                >
+                  <Icon icon="lucide:settings" width="15" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon-only
+                  title="彻底删除（取消注册并删除依赖）"
+                  :disabled="!auth_store.is_admin || Boolean(uninstalling_adapter)"
+                  :loading="uninstalling_adapter === adapter.module_name"
+                  @click="confirm_uninstall(adapter)"
+                >
+                  <Icon icon="lucide:trash-2" width="15" />
+                </Button>
+              </div>
             </template>
             <template v-else>
               <Button
@@ -210,7 +253,7 @@ async function do_uninstall() {
 
 .adapter-row {
   display: grid;
-  grid-template-columns: 38px minmax(280px, 1fr) minmax(120px, auto) 84px;
+  grid-template-columns: 38px minmax(280px, 1fr) minmax(120px, auto) 140px;
   align-items: center;
   gap: var(--space-3);
   min-height: 92px;
@@ -285,6 +328,12 @@ async function do_uninstall() {
   gap: var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-xs);
+}
+
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .uninstall-warning {
