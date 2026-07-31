@@ -18,12 +18,12 @@ const { connect, disconnect } = use_websocket()
 onMounted(() => {
   auth_store.fetch_me().catch(() => {})
   status_store.fetch_status().catch(() => {})
-  status_store.start_polling()
+  status_store.init()
   connect()
 })
 
 onUnmounted(() => {
-  status_store.stop_polling()
+  status_store.dispose()
   disconnect()
 })
 </script>

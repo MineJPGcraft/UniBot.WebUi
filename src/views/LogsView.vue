@@ -1,10 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useLogStore } from '@/stores/log'
 import { use_toast } from '@/composables/use_toast'
-import { use_websocket } from '@/composables/use_websocket'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -16,7 +15,6 @@ import { format_bytes, format_datetime, level_class } from '@/utils/format'
 
 const log_store = useLogStore()
 const toast = use_toast()
-const { on_event } = use_websocket()
 const {
   file_list,
   current_file,
@@ -27,15 +25,14 @@ const {
   level_filter,
   keyword_filter,
   loading,
+  live_logs,
+  live_version,
 } = storeToRefs(log_store)
 
-const active_tab = ref('history') // history | realtime
+const active_tab = ref('realtime') // history | realtime
 const keyword_input = ref('')
 const auto_scroll = ref(true)
-const live_logs = ref([])
 const live_container = ref(null)
-
-let unsubscribe_log = null
 
 const level_options = [
   { value: 'all', label: '全部级别' },
@@ -52,7 +49,29 @@ const filtered_live_logs = computed(() => {
   return live_logs.value.filter((log) => log.level === live_level_filter.value)
 })
 
+// 共享缓存收到新日志时自动滚到底部
+// （store 用 live_version 计数器通知，watch 数组 ref 的 push 不会触发）
+watch(live_version, () => {
+  if (auto_scroll.value) scroll_to_bottom()
+})
+
+// 切到实时日志 tab 时，将已有日志滚到底部
+watch(active_tab, (tab) => {
+  if (tab === 'realtime') scroll_to_bottom()
+})
+
+function scroll_to_bottom() {
+  nextTick(() => {
+    if (live_container.value) {
+      live_container.value.scrollTop = live_container.value.scrollHeight
+    }
+  })
+}
+
 onMounted(async () => {
+  // 实时日志由共享 store 缓存，跨页面保留；此处只需确保订阅已启动
+  log_store.init_live()
+
   try {
     await log_store.fetch_file_list()
     if (file_list.value.length > 0) {
@@ -62,22 +81,6 @@ onMounted(async () => {
   } catch (error) {
     toast.error(error.message || '获取日志失败')
   }
-
-  unsubscribe_log = on_event('log', (data) => {
-    live_logs.value.push(data)
-    if (live_logs.value.length > 500) live_logs.value.shift()
-    if (auto_scroll.value) {
-      nextTick(() => {
-        if (live_container.value) {
-          live_container.value.scrollTop = live_container.value.scrollHeight
-        }
-      })
-    }
-  })
-})
-
-onUnmounted(() => {
-  unsubscribe_log?.()
 })
 
 async function select_file(name) {
@@ -242,14 +245,14 @@ async function handle_page_change(target_page) {
           <Icon icon="lucide:arrow-down-to-line" width="13" />
           自动滚动 {{ auto_scroll ? '开' : '关' }}
         </button>
-        <Button variant="ghost" size="sm" @click="live_logs = []">清空</Button>
+        <Button variant="ghost" size="sm" @click="log_store.clear_live()">清空</Button>
         <span class="text-xs text-muted">已接收 {{ live_logs.length }} 条</span>
       </div>
       <div ref="live_container" class="live-stream">
         <div v-if="filtered_live_logs.length === 0" class="live-empty">等待日志推送…</div>
         <div
           v-for="(log, index) in filtered_live_logs"
-          :key="`${log.time}-${index}`"
+          :key="log.seq || `${log.time}-${index}`"
           class="log-line"
         >
           <span class="log-time mono">{{ log.time }}</span>
@@ -307,16 +310,27 @@ async function handle_page_change(target_page) {
   }
 }
 
-/* 双栏布局 */
+/* 双栏布局：卡片整体约占 80% 页面高度（100px 为页面标题区估算高度） */
 .log-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: var(--space-5);
-  align-items: start;
+  height: calc(80vh - 100px);
+  min-height: 420px;
+}
+
+/* 卡片内部纵向排布，内容区自动撑满剩余高度 */
+.file-panel,
+.content-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .file-list {
-  max-height: 560px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-2);
 }
@@ -384,6 +398,14 @@ async function handle_page_change(target_page) {
   border-bottom: 1px solid var(--border);
 }
 
+/* 实时日志面板：约占 80% 页面高度，内容区弹性撑满 */
+.realtime-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(80vh - 100px);
+  min-height: 420px;
+}
+
 .keyword-box {
   display: flex;
   gap: var(--space-2);
@@ -409,21 +431,33 @@ async function handle_page_change(target_page) {
   color: var(--success);
 }
 
-/* 日志内容 */
+/* 日志内容：弹性占满卡片剩余高度 */
 .log-content,
 .live-stream {
-  height: 520px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-3) var(--space-4);
   background: var(--surface-sunken);
+  /* 深色内容块贴合卡片底部时保留外框圆角，避免直角遮住圆角 */
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.7;
 }
 
 .content-empty {
-  height: 520px;
+  flex: 1;
+  min-height: 0;
   display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 加载中同样占满内容区 */
+.log-layout .loading-block,
+.realtime-panel .loading-block {
+  flex: 1;
   align-items: center;
   justify-content: center;
 }
@@ -478,6 +512,8 @@ async function handle_page_change(target_page) {
   justify-content: flex-end;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border);
+  /* 与卡片外框底部圆角对齐 */
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 @media (max-width: 900px) {

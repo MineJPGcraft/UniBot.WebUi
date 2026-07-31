@@ -114,13 +114,15 @@ function disconnect() {
 }
 
 /** 订阅事件，返回取消订阅函数 */
-function on_event(event_type, callback) {
+function on_event(event_type, callback, { subscribe = true } = {}) {
   if (!event_listeners.has(event_type)) {
     event_listeners.set(event_type, new Set())
   }
   event_listeners.get(event_type).add(callback)
 
-  if (!subscribed_events.has(event_type)) {
+  // subscribe=false 表示仅监听该类型消息，不向服务端注册订阅
+  // （如 log_history 是订阅 log 后由服务端补发的缓存消息）
+  if (subscribe && !subscribed_events.has(event_type)) {
     subscribed_events.add(event_type)
     send({ type: 'subscribe', events: [event_type] })
   }
@@ -134,8 +136,10 @@ function off_event(event_type, callback) {
   listeners.delete(callback)
   if (listeners.size === 0) {
     event_listeners.delete(event_type)
-    subscribed_events.delete(event_type)
-    send({ type: 'unsubscribe', events: [event_type] })
+    // 仅当该事件确实订阅过时才向服务端取消订阅
+    if (subscribed_events.delete(event_type)) {
+      send({ type: 'unsubscribe', events: [event_type] })
+    }
   }
 }
 

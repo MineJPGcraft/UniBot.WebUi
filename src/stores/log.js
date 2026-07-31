@@ -5,9 +5,13 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { http } from '@/utils/http'
+import { use_websocket } from '@/composables/use_websocket'
 
 const LOG_LINE_PATTERN =
   /^(?<date>\d{4}-\d{2}-\d{2})\s+(?<time>\d{2}:\d{2}:\d{2}\.\d+)\s*\|\s*(?<level>\w+)\s*\|\s*(?<module>[^-]+?)\s*-\s*(?<message>.*)$/
+
+/** 实时日志缓存上限（跨页面共享，超出后丢弃最早的） */
+const MAX_LIVE_LOGS = 500
 
 function parse_line(raw) {
   const match = raw.text.match(LOG_LINE_PATTERN)
@@ -89,6 +93,50 @@ export const useLogStore = defineStore('log', () => {
     page.value = value
   }
 
+  // ---------- 实时日志（跨页面共享缓存） ----------
+  const live_logs = ref([])
+  const live_max_seq = ref(0)
+  // 每收到一条新日志自增，供页面 watch 触发自动滚动
+  // （watch 数组 ref 的 push 不会触发，必须依赖该计数器）
+  const live_version = ref(0)
+  let live_subscription = null
+  let live_history_subscription = null
+  let live_initialized = false
+
+  function push_live(log) {
+    // 用 seq 去重：断线重连后补发的历史日志可能与实时推送重复
+    if (typeof log.seq === 'number') {
+      if (log.seq <= live_max_seq.value) return
+      live_max_seq.value = log.seq
+    }
+    live_logs.value.push(log)
+    if (live_logs.value.length > MAX_LIVE_LOGS) {
+      live_logs.value.splice(0, live_logs.value.length - MAX_LIVE_LOGS)
+    }
+    live_version.value += 1
+  }
+
+  /** 启动实时日志订阅（幂等，任意页面调用一次即可，缓存跨页面保留） */
+  function init_live() {
+    if (live_initialized) return
+    live_initialized = true
+    const { on_event } = use_websocket()
+    live_subscription = on_event('log', push_live)
+    // log_history 是订阅 log 后服务端补发的历史缓存，仅监听、不重复订阅
+    live_history_subscription = on_event(
+      'log_history',
+      (logs) => {
+        for (const log of logs) push_live(log)
+      },
+      { subscribe: false },
+    )
+  }
+
+  function clear_live() {
+    live_logs.value = []
+    live_max_seq.value = 0
+  }
+
   return {
     file_list,
     current_file,
@@ -99,11 +147,15 @@ export const useLogStore = defineStore('log', () => {
     level_filter,
     keyword_filter,
     loading,
+    live_logs,
+    live_version,
     fetch_file_list,
     fetch_content,
     select_file,
     set_level_filter,
     set_keyword_filter,
     set_page,
+    init_live,
+    clear_live,
   }
 })

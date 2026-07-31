@@ -146,13 +146,16 @@ async function submit_unbind() {
             <td>
               <div class="player-tags">
                 <span v-for="player in binding.players" :key="player" class="player-tag">
-                  <img
-                    class="player-head"
-                    :src="`https://mc-heads.net/avatar/${encodeURIComponent(player)}/20`"
-                    alt=""
-                    loading="lazy"
-                    referrerpolicy="no-referrer"
-                  />
+                  <span class="player-head-wrap">
+                    <img
+                      class="player-head"
+                      :src="`/webui/api/players/${encodeURIComponent(player)}/avatar`"
+                      alt=""
+                      loading="lazy"
+                      @error="(e) => (e.target.style.display = 'none')"
+                    />
+                    <span class="player-head-fallback">{{ player.slice(0, 1).toUpperCase() }}</span>
+                  </span>
                   {{ player }}
                   <button
                     v-if="auth_store.is_operator"
@@ -273,11 +276,34 @@ async function submit_unbind() {
   font-family: var(--font-mono);
 }
 
+.player-head-wrap {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 .player-head {
+  position: relative;
+  z-index: 1;
   width: 16px;
   height: 16px;
   border-radius: 3px;
   image-rendering: pixelated;
+  background: var(--surface-sunken);
+}
+
+.player-head-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border-radius: 3px;
 }
 
 .tag-remove {

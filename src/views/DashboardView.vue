@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStatusStore } from '@/stores/status'
 import { useServerStore } from '@/stores/server'
+import { useLogStore } from '@/stores/log'
 import { use_websocket } from '@/composables/use_websocket'
 import Badge from '@/components/ui/Badge.vue'
 import Progress from '@/components/ui/Progress.vue'
@@ -15,14 +16,14 @@ import { server_type_icon, server_type_label } from '@/utils/server'
 const router = useRouter()
 const status_store = useStatusStore()
 const server_store = useServerStore()
+const log_store = useLogStore()
 const { status } = storeToRefs(status_store)
 const { server_list } = storeToRefs(server_store)
-const { connection_state, on_event } = use_websocket()
+const { live_logs } = storeToRefs(log_store)
+const { connection_state } = use_websocket()
 
-const live_logs = ref([])
-const MAX_LIVE_LOGS = 80
-
-let unsubscribe_log = null
+/** 首页展示最近 80 条实时日志，最新在上 */
+const display_logs = computed(() => [...live_logs.value].reverse().slice(0, 80))
 
 const memory_percent = computed(() => {
   const memory_mb = status.value?.memory_mb || 0
@@ -40,16 +41,8 @@ const stat_items = computed(() => [
 
 onMounted(async () => {
   server_store.fetch_server_list().catch(() => {})
-  unsubscribe_log = on_event('log', (data) => {
-    live_logs.value.unshift(data)
-    if (live_logs.value.length > MAX_LIVE_LOGS) {
-      live_logs.value.pop()
-    }
-  })
-})
-
-onUnmounted(() => {
-  unsubscribe_log?.()
+  // 实时日志由共享 store 缓存，离开页面再回来日志仍保留
+  log_store.init_live()
 })
 </script>
 
@@ -153,7 +146,11 @@ onUnmounted(() => {
         </div>
         <div class="log-stream">
           <div v-if="live_logs.length === 0" class="log-placeholder">等待日志推送…</div>
-          <div v-for="(log, index) in live_logs" :key="`${log.time}-${index}`" class="log-row">
+          <div
+            v-for="(log, index) in display_logs"
+            :key="log.seq || `${log.time}-${index}`"
+            class="log-row"
+          >
             <span class="log-time mono">{{ log.time }}</span>
             <span class="log-level mono" :class="level_class(log.level)">
               {{ log.level || '—' }}
