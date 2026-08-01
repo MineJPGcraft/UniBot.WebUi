@@ -21,6 +21,14 @@ export const useConfigStore = defineStore('config', () => {
   const env_loading = ref(false)
   const env_saving = ref(false)
 
+  // 原始文件编辑（Config.toml / .env 源码）
+  const raw_config = ref('')
+  const raw_env = ref('')
+  const raw_config_original = ref('')
+  const raw_env_original = ref('')
+  const raw_loading = ref(false)
+  const raw_saving = ref(false)
+
   /** 草稿相对原配置的变更项：[{ key, label, old_value, new_value }] */
   const changes = computed(() => {
     if (!config_data.value || !draft.value || !schema.value) return []
@@ -53,6 +61,12 @@ export const useConfigStore = defineStore('config', () => {
   })
 
   const has_env_changes = computed(() => env_changes.value.length > 0)
+
+  /** 原始文件是否有未保存的改动 */
+  const has_raw_changes = computed(
+    () =>
+      raw_config.value !== raw_config_original.value || raw_env.value !== raw_env_original.value,
+  )
 
   async function fetch_all() {
     loading.value = true
@@ -138,6 +152,39 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  /** 获取 Config.toml 与 .env 的原始文本内容 */
+  async function fetch_raw() {
+    raw_loading.value = true
+    try {
+      const data = await http.get('/api/config/raw')
+      raw_config.value = data.config_toml || ''
+      raw_env.value = data.env || ''
+      raw_config_original.value = raw_config.value
+      raw_env_original.value = raw_env.value
+    } finally {
+      raw_loading.value = false
+    }
+  }
+
+  /** 保存原始文件改动（仅提交有变更的文件），返回 { saved_toml, saved_env } */
+  async function save_raw() {
+    if (!has_raw_changes.value) return { saved_toml: false, saved_env: false }
+    raw_saving.value = true
+    try {
+      const saved_toml = raw_config.value !== raw_config_original.value
+      const saved_env = raw_env.value !== raw_env_original.value
+      const patch = {}
+      if (saved_toml) patch.config_toml = raw_config.value
+      if (saved_env) patch.env = raw_env.value
+      await http.patch('/api/config/raw', patch)
+      raw_config_original.value = raw_config.value
+      raw_env_original.value = raw_env.value
+      return { saved_toml, saved_env }
+    } finally {
+      raw_saving.value = false
+    }
+  }
+
   return {
     config_data,
     schema,
@@ -163,5 +210,15 @@ export const useConfigStore = defineStore('config', () => {
     update_env_field,
     reset_env_draft,
     save_env_changes,
+    // 原始文件编辑
+    raw_config,
+    raw_env,
+    raw_config_original,
+    raw_env_original,
+    raw_loading,
+    raw_saving,
+    has_raw_changes,
+    fetch_raw,
+    save_raw,
   }
 })

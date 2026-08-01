@@ -14,6 +14,7 @@ import Switch from '@/components/ui/Switch.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
+import CodeEditor from '@/components/ui/CodeEditor.vue'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -33,16 +34,25 @@ const {
   env_saving,
   env_changes,
   has_env_changes,
+  raw_config,
+  raw_env,
+  raw_config_original,
+  raw_env_original,
+  raw_loading,
+  raw_saving,
 } = storeToRefs(config_store)
 
 const route = useRoute()
 const router = useRouter()
 
-const active_tab = ref(route.query.tab === 'env' ? 'env' : 'toml')
+const active_tab = ref(['toml', 'env'].includes(route.query.tab) ? route.query.tab : 'toml')
 const active_group = ref('')
 const active_env_group = ref('')
 const diff_open = ref(false)
 const env_diff_open = ref(false)
+const raw_editor_open = ref(false)
+const raw_editor_target = ref('toml')
+const raw_loaded = ref(false)
 const json_errors = ref({})
 const platform_item_ids = ref({})
 let platform_item_sequence = 0
@@ -84,7 +94,9 @@ onMounted(async () => {
 })
 
 // 切换 tab / group 时同步到 URL query，便于分享与刷新保持
-watch(active_tab, (val) => sync_query({ tab: val }))
+watch(active_tab, (val) => {
+  sync_query({ tab: val })
+})
 watch(active_env_group, (val) => {
   if (active_tab.value === 'env') sync_query({ group: val })
 })
@@ -259,6 +271,53 @@ async function confirm_env_save() {
     toast.error(error.message || '保存失败')
   }
 }
+
+async function confirm_raw_save() {
+  try {
+    const { saved_toml, saved_env } = await config_store.save_raw()
+    if (raw_editor_target.value === 'env') {
+      if (saved_env) {
+        toast.success('保存成功，.env 改动需重启机器人生效')
+        ask_restart('.env 与框架相关配置的改动需要重启机器人生效，是否立即重启？')
+      } else {
+        toast.success('未检测到改动')
+      }
+    } else {
+      toast.success(saved_toml ? '保存成功，Config.toml 已热更新' : '未检测到改动')
+    }
+    raw_editor_open.value = false
+  } catch (error) {
+    toast.error(error.message || '保存失败')
+  }
+}
+
+function reset_raw() {
+  if (raw_editor_target.value === 'env') {
+    raw_env.value = raw_env_original.value
+  } else {
+    raw_config.value = raw_config_original.value
+  }
+}
+
+const current_raw_changed = computed(() =>
+  raw_editor_target.value === 'env'
+    ? raw_env.value !== raw_env_original.value
+    : raw_config.value !== raw_config_original.value,
+)
+
+async function open_raw_editor(target) {
+  raw_editor_target.value = target
+  raw_editor_open.value = true
+  if (!raw_loaded.value) {
+    raw_loaded.value = true
+    try {
+      await config_store.fetch_raw()
+    } catch (error) {
+      raw_loaded.value = false
+      toast.error(error.message || '加载配置文件失败')
+    }
+  }
+}
 </script>
 
 <template>
@@ -274,6 +333,10 @@ async function confirm_env_save() {
       <!-- Config.toml 配置 -->
       <template #toml>
         <div class="tab-actions">
+          <Button variant="secondary" @click="open_raw_editor('toml')">
+            <Icon icon="lucide:file-code" width="15" />
+            编辑源代码
+          </Button>
           <Button variant="ghost" :disabled="!has_changes" @click="config_store.reset_draft()">
             撤销修改
           </Button>
@@ -466,6 +529,10 @@ async function confirm_env_save() {
       <!-- 环境变量 -->
       <template #env>
         <div class="tab-actions">
+          <Button variant="secondary" @click="open_raw_editor('env')">
+            <Icon icon="lucide:file-code" width="15" />
+            编辑源代码
+          </Button>
           <Button
             variant="ghost"
             :disabled="!has_env_changes"
@@ -585,6 +652,65 @@ async function confirm_env_save() {
         </div>
       </template>
     </Tabs>
+
+    <!-- 源码编辑弹窗：按当前 tab 编辑对应文件的原始文本 -->
+    <Dialog
+      v-model="raw_editor_open"
+      :title="raw_editor_target === 'env' ? '编辑 .env 源代码' : '编辑 Config.toml 源代码'"
+      :description="
+        raw_editor_target === 'env'
+          ? '直接编辑 .env 源码，改动需重启机器人生效；请谨慎修改，错误的语法会导致配置无法加载。'
+          : '直接编辑 Config.toml 源码，保存后立即热更新；请谨慎修改，错误的语法会导致配置无法加载。'
+      "
+      confirm-text="保存修改"
+      :loading="raw_saving"
+      width="min(960px, calc(100vw - 32px))"
+      @confirm="confirm_raw_save"
+    >
+      <div v-if="raw_loading" class="raw-loading">
+        <Spinner />
+        <span>正在加载配置文件…</span>
+      </div>
+      <template v-else>
+        <div class="raw-field">
+          <label class="raw-label">
+            <Icon
+              :icon="raw_editor_target === 'env' ? 'lucide:terminal' : 'lucide:file-cog'"
+              width="14"
+            />
+            {{ raw_editor_target === 'env' ? '.env' : 'Config.toml' }}
+          </label>
+          <CodeEditor
+            v-if="raw_editor_target === 'env'"
+            v-model="raw_env"
+            language="properties"
+            class="raw-code-editor raw-code-editor--env"
+          />
+          <CodeEditor v-else v-model="raw_config" language="toml" class="raw-code-editor" />
+        </div>
+      </template>
+      <div class="raw-actions">
+        <span v-if="current_raw_changed" class="raw-changed">
+          <Icon icon="lucide:circle-alert" width="13" />
+          有未保存的修改
+        </span>
+        <span v-else class="raw-saved-tip">
+          <Icon icon="lucide:check" width="13" />
+          已是最新内容
+        </span>
+        <div class="raw-actions-right">
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="raw_loading || !current_raw_changed"
+            @click="reset_raw"
+          >
+            <Icon icon="lucide:rotate-ccw" width="14" />
+            恢复原内容
+          </Button>
+        </div>
+      </div>
+    </Dialog>
 
     <!-- Config.toml 保存前 diff 预览 -->
     <Dialog
@@ -878,6 +1004,81 @@ async function confirm_env_save() {
 @media (max-width: 700px) {
   .platform-list-item {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 源码编辑弹窗 */
+.raw-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-10) 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.raw-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.raw-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.raw-code-editor {
+  height: 480px;
+}
+
+.raw-code-editor--env {
+  height: 360px;
+}
+
+.raw-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.raw-changed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--warning);
+}
+
+.raw-saved-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.raw-actions-right {
+  display: flex;
+  gap: var(--space-2);
+}
+
+@media (max-width: 700px) {
+  .raw-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .raw-actions-right {
+    justify-content: flex-end;
   }
 }
 </style>

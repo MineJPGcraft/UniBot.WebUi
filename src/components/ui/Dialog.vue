@@ -21,6 +21,8 @@ defineProps({
   confirmVariant: { type: String, default: 'primary' },
   loading: { type: Boolean, default: false },
   hideFooter: { type: Boolean, default: false },
+  /** 覆盖默认宽度（如代码编辑弹窗需要更宽） */
+  width: { type: String, default: '' },
 })
 
 defineEmits(['confirm'])
@@ -35,6 +37,7 @@ defineEmits(['confirm'])
       <DialogOverlay class="ui-dialog-overlay" />
       <DialogContent
         class="ui-dialog-content"
+        :style="width ? { width } : undefined"
         :aria-describedby="description ? 'dialog-description' : undefined"
       >
         <DialogTitle class="ui-dialog-title">{{ title }}</DialogTitle>

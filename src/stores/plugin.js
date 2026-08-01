@@ -10,6 +10,8 @@ export const usePluginStore = defineStore('plugin', () => {
   const registered_plugin_modules = ref([])
   const market_items = ref([])
   const market_total = ref(0)
+  const market_page = ref(1)
+  const market_page_size = ref(20)
   const loading = ref(false)
   const market_loading = ref(false)
 
@@ -31,9 +33,7 @@ export const usePluginStore = defineStore('plugin', () => {
   }
 
   async function remove_plugin(module_name) {
-    await http.delete('/api/config/nonebot/plugins', {
-      body: { name: module_name, module_name },
-    })
+    await http.delete(`/api/plugins/${encodeURIComponent(module_name)}`)
     await Promise.all([fetch_installed(), fetch_registered_plugins()])
   }
 
@@ -50,13 +50,23 @@ export const usePluginStore = defineStore('plugin', () => {
       })
       market_items.value = data.items
       market_total.value = data.total
+      market_page.value = data.page || page
+      market_page_size.value = data.page_size || page_size
     } finally {
       market_loading.value = false
     }
   }
 
+  async function go_market_page(page) {
+    await fetch_market({ page, page_size: market_page_size.value })
+  }
+
   async function install_plugin(name, version) {
     return await http.post('/api/plugins/market/install', { name, version })
+  }
+
+  async function upgrade_plugin(name) {
+    return await http.post('/api/plugins/market/upgrade', { name })
   }
 
   return {
@@ -64,6 +74,8 @@ export const usePluginStore = defineStore('plugin', () => {
     registered_plugin_modules,
     market_items,
     market_total,
+    market_page,
+    market_page_size,
     loading,
     market_loading,
     fetch_installed,
@@ -71,6 +83,8 @@ export const usePluginStore = defineStore('plugin', () => {
     remove_plugin,
     fetch_registered_plugins,
     fetch_market,
+    go_market_page,
     install_plugin,
+    upgrade_plugin,
   }
 })
