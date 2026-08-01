@@ -333,7 +333,11 @@ async function open_raw_editor(target) {
       <!-- Config.toml 配置 -->
       <template #toml>
         <div class="tab-actions">
-          <Button variant="secondary" @click="open_raw_editor('toml')">
+          <Button
+            class="tab-action-left"
+            variant="secondary"
+            @click="open_raw_editor('toml')"
+          >
             <Icon icon="lucide:file-code" width="15" />
             编辑源代码
           </Button>
@@ -529,7 +533,11 @@ async function open_raw_editor(target) {
       <!-- 环境变量 -->
       <template #env>
         <div class="tab-actions">
-          <Button variant="secondary" @click="open_raw_editor('env')">
+          <Button
+            class="tab-action-left"
+            variant="secondary"
+            @click="open_raw_editor('env')"
+          >
             <Icon icon="lucide:file-code" width="15" />
             编辑源代码
           </Button>
@@ -993,12 +1001,16 @@ async function open_raw_editor(target) {
   }
 }
 
-/* 标签页操作栏 */
+/* 标签页操作栏：编辑源代码靠左，撤销/保存靠右 */
 .tab-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   margin: var(--space-4) 0;
+}
+
+.tab-actions .tab-action-left {
+  margin-right: auto;
 }
 
 @media (max-width: 700px) {

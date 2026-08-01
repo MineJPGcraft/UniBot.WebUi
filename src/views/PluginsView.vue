@@ -226,6 +226,9 @@ async function refresh_after_market_action() {
               <Icon icon="lucide:search" width="14" />
               搜索
             </Button>
+            <p class="market-hint">
+              插件均来自 NoneBot2 官方插件商店，安装后请参考插件 Github 说明，前往 .env 自行配置参数。
+            </p>
           </form>
 
           <div v-if="market_loading" class="loading-block"><Spinner :size="18" /> 加载中…</div>
@@ -418,6 +421,7 @@ async function refresh_after_market_action() {
 
 .market-toolbar {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
@@ -425,6 +429,14 @@ async function refresh_after_market_action() {
 
 .market-toolbar .market-search {
   width: 300px;
+}
+
+/* 工具栏右侧提示文案 */
+.market-hint {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 .market-grid {
