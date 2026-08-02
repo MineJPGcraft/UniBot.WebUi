@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import {
   SelectRoot,
   SelectTrigger,
@@ -14,17 +15,26 @@ import { Icon } from '@iconify/vue'
 
 const model = defineModel({ type: String, default: '' })
 
-defineProps({
+const props = defineProps({
   options: { type: Array, required: true }, // [{ value, label }]
   placeholder: { type: String, default: '请选择' },
   disabled: { type: Boolean, default: false },
+})
+
+// 自行从 options 同步计算展示文本，避免依赖 reka-ui 内部 optionsSet
+// 的注册时机导致的「先显示占位符再变回真实值」闪烁。
+const selected_label = computed(() => {
+  const option = props.options.find((item) => String(item.value) === String(model.value))
+  return option ? option.label : ''
 })
 </script>
 
 <template>
   <SelectRoot v-model="model" :disabled="disabled">
     <SelectTrigger class="ui-select-trigger">
-      <SelectValue :placeholder="placeholder" />
+      <SelectValue :placeholder="placeholder">
+        {{ selected_label || placeholder }}
+      </SelectValue>
       <SelectIcon>
         <Icon icon="lucide:chevron-down" width="14" />
       </SelectIcon>

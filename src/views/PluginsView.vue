@@ -227,7 +227,8 @@ async function refresh_after_market_action() {
               搜索
             </Button>
             <p class="market-hint">
-              插件均来自 NoneBot2 官方插件商店，安装后请参考插件 Github 说明，前往 .env 自行配置参数。
+              插件均来自 NoneBot2 官方插件商店，安装后请参考插件 Github 说明，前往 .env
+              自行配置参数。
             </p>
           </form>
 

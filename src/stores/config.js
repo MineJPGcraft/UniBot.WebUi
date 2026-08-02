@@ -29,6 +29,12 @@ export const useConfigStore = defineStore('config', () => {
   const raw_loading = ref(false)
   const raw_saving = ref(false)
 
+  // 消息文本（Messages.toml 源码）
+  const messages_toml = ref('')
+  const messages_original = ref('')
+  const messages_loading = ref(false)
+  const messages_saving = ref(false)
+
   /** 草稿相对原配置的变更项：[{ key, label, old_value, new_value }] */
   const changes = computed(() => {
     if (!config_data.value || !draft.value || !schema.value) return []
@@ -67,6 +73,9 @@ export const useConfigStore = defineStore('config', () => {
     () =>
       raw_config.value !== raw_config_original.value || raw_env.value !== raw_env_original.value,
   )
+
+  /** 消息文本是否有未保存的改动 */
+  const has_messages_changes = computed(() => messages_toml.value !== messages_original.value)
 
   async function fetch_all() {
     loading.value = true
@@ -185,6 +194,31 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  /** 获取 Messages.toml 原始文本内容 */
+  async function fetch_messages() {
+    messages_loading.value = true
+    try {
+      const data = await http.get('/api/config/messages')
+      messages_toml.value = data.messages_toml || ''
+      messages_original.value = messages_toml.value
+    } finally {
+      messages_loading.value = false
+    }
+  }
+
+  /** 保存消息文本改动 */
+  async function save_messages() {
+    if (!has_messages_changes.value) return false
+    messages_saving.value = true
+    try {
+      await http.patch('/api/config/messages', { messages_toml: messages_toml.value })
+      messages_original.value = messages_toml.value
+      return true
+    } finally {
+      messages_saving.value = false
+    }
+  }
+
   return {
     config_data,
     schema,
@@ -220,5 +254,13 @@ export const useConfigStore = defineStore('config', () => {
     has_raw_changes,
     fetch_raw,
     save_raw,
+    // 消息文本
+    messages_toml,
+    messages_original,
+    messages_loading,
+    messages_saving,
+    has_messages_changes,
+    fetch_messages,
+    save_messages,
   }
 })

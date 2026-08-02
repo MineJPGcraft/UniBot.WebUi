@@ -40,12 +40,19 @@ const {
   raw_env_original,
   raw_loading,
   raw_saving,
+  messages_toml,
+  messages_original,
+  messages_loading,
+  messages_saving,
+  has_messages_changes,
 } = storeToRefs(config_store)
 
 const route = useRoute()
 const router = useRouter()
 
-const active_tab = ref(['toml', 'env'].includes(route.query.tab) ? route.query.tab : 'toml')
+const active_tab = ref(
+  ['toml', 'env', 'messages'].includes(route.query.tab) ? route.query.tab : 'toml',
+)
 const active_group = ref('')
 const active_env_group = ref('')
 const diff_open = ref(false)
@@ -60,6 +67,7 @@ let platform_item_sequence = 0
 const tabs = [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
   { value: 'env', label: '环境变量', icon: 'lucide:terminal' },
+  { value: 'messages', label: '消息文本', icon: 'lucide:message-square' },
 ]
 
 const groups = computed(() => schema.value?.groups || [])
@@ -91,11 +99,13 @@ onMounted(async () => {
   } catch {
     // 环境变量加载失败不阻塞页面
   }
+  if (active_tab.value === 'messages') ensure_messages()
 })
 
 // 切换 tab / group 时同步到 URL query，便于分享与刷新保持
 watch(active_tab, (val) => {
   sync_query({ tab: val })
+  if (val === 'messages') ensure_messages()
 })
 watch(active_env_group, (val) => {
   if (active_tab.value === 'env') sync_query({ group: val })
@@ -305,6 +315,14 @@ const current_raw_changed = computed(() =>
     : raw_config.value !== raw_config_original.value,
 )
 
+/** 消息文本行数（空文本按 0 计） */
+const messages_line_count = computed(() =>
+  messages_toml.value ? messages_toml.value.split('\n').length : 0,
+)
+
+/** 消息文本字符数（不含换行） */
+const messages_char_count = computed(() => messages_toml.value.replace(/\n/g, '').length)
+
 async function open_raw_editor(target) {
   raw_editor_target.value = target
   raw_editor_open.value = true
@@ -316,6 +334,33 @@ async function open_raw_editor(target) {
       raw_loaded.value = false
       toast.error(error.message || '加载配置文件失败')
     }
+  }
+}
+
+const messages_loaded = ref(false)
+
+/** 进入消息 tab 时按需加载 Messages.toml */
+async function ensure_messages() {
+  if (messages_loaded.value) return
+  messages_loaded.value = true
+  try {
+    await config_store.fetch_messages()
+  } catch (error) {
+    messages_loaded.value = false
+    toast.error(error.message || '加载消息文本失败')
+  }
+}
+
+function reset_messages() {
+  messages_toml.value = messages_original.value
+}
+
+async function confirm_messages_save() {
+  try {
+    const saved = await config_store.save_messages()
+    toast.success(saved ? '消息文本已保存并生效' : '未检测到改动')
+  } catch (error) {
+    toast.error(error.message || '保存失败')
   }
 }
 </script>
@@ -333,11 +378,7 @@ async function open_raw_editor(target) {
       <!-- Config.toml 配置 -->
       <template #toml>
         <div class="tab-actions">
-          <Button
-            class="tab-action-left"
-            variant="secondary"
-            @click="open_raw_editor('toml')"
-          >
+          <Button class="tab-action-left" variant="secondary" @click="open_raw_editor('toml')">
             <Icon icon="lucide:file-code" width="15" />
             编辑源代码
           </Button>
@@ -533,11 +574,7 @@ async function open_raw_editor(target) {
       <!-- 环境变量 -->
       <template #env>
         <div class="tab-actions">
-          <Button
-            class="tab-action-left"
-            variant="secondary"
-            @click="open_raw_editor('env')"
-          >
+          <Button class="tab-action-left" variant="secondary" @click="open_raw_editor('env')">
             <Icon icon="lucide:file-code" width="15" />
             编辑源代码
           </Button>
@@ -658,6 +695,77 @@ async function open_raw_editor(target) {
             </div>
           </section>
         </div>
+      </template>
+
+      <!-- 消息文本 -->
+      <template #messages>
+        <div class="tab-actions">
+          <Button variant="ghost" :disabled="!has_messages_changes" @click="reset_messages">
+            撤销修改
+          </Button>
+          <Button
+            variant="primary"
+            :disabled="!has_messages_changes"
+            @click="confirm_messages_save"
+          >
+            <Icon icon="lucide:save" width="15" />
+            保存修改
+          </Button>
+        </div>
+
+        <div v-if="messages_loading" class="card">
+          <div class="loading-block"><Spinner :size="18" /> 加载消息文本…</div>
+        </div>
+
+        <section v-else class="card message-editor">
+          <div class="card-header message-editor-header">
+            <div class="message-editor-heading">
+              <div class="message-editor-title">
+                <span class="message-editor-badge">
+                  <Icon icon="lucide:message-square-text" width="16" />
+                </span>
+                <div>
+                  <h3 class="card-title">Messages.toml</h3>
+                  <p class="message-editor-sub">
+                    编辑机器人回复文本，支持
+                    <code class="mono message-code">{占位符}</code>，保存后立即生效
+                  </p>
+                </div>
+              </div>
+            </div>
+            <span v-if="!messages_loading" class="message-editor-meta">
+              {{ messages_line_count }} 行 · {{ messages_char_count }} 字符
+            </span>
+          </div>
+          <div class="message-editor-body">
+            <div v-if="messages_toml === ''" class="raw-loading">
+              <Spinner />
+              <span>正在加载消息配置…</span>
+            </div>
+            <CodeEditor
+              v-else
+              v-model="messages_toml"
+              language="toml"
+              class="raw-code-editor raw-code-editor--messages"
+            />
+          </div>
+          <div class="message-editor-footer">
+            <div class="message-editor-hint">
+              <Icon icon="lucide:info" width="13" />
+              使用
+              <code class="mono message-code">{name}</code>
+              形式的占位符引用玩家名 / 数值等动态内容
+            </div>
+            <span v-if="has_messages_changes" class="raw-changed">
+              <Icon icon="lucide:circle-alert" width="13" />
+              有未保存的修改
+            </span>
+            <span v-else class="raw-saved-tip">
+              <Icon icon="lucide:check-circle" width="13" />
+              已是最新内容
+            </span>
+          </div>
+        </section>
       </template>
     </Tabs>
 
@@ -1052,6 +1160,114 @@ async function open_raw_editor(target) {
 
 .raw-code-editor--env {
   height: 360px;
+}
+
+/* 消息文本编辑器 */
+.message-editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.message-editor-header {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.message-editor-heading {
+  display: flex;
+  align-items: center;
+}
+
+.message-editor-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.message-editor-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  flex-shrink: 0;
+}
+
+.message-editor-sub {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.message-editor-meta {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  white-space: nowrap;
+}
+
+.message-editor-body {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.message-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+}
+
+.message-editor-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.raw-code-editor--messages {
+  height: 460px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.message-code {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .message-editor-meta {
+    display: none;
+  }
+
+  .message-editor-footer {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .message-editor-footer .raw-changed,
+  .message-editor-footer .raw-saved-tip {
+    justify-content: flex-start;
+  }
+
+  .raw-code-editor--messages {
+    height: 380px;
+  }
 }
 
 .raw-actions {
