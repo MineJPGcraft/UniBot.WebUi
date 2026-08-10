@@ -5,6 +5,9 @@ defineProps({
   type: { type: String, default: 'text' },
   placeholder: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
+  min: { type: [Number, String], default: undefined },
+  max: { type: [Number, String], default: undefined },
+  step: { type: [Number, String], default: undefined },
 })
 </script>
 
@@ -15,6 +18,9 @@ defineProps({
     :type="type"
     :placeholder="placeholder"
     :disabled="disabled"
+    :min="min"
+    :max="max"
+    :step="step"
   />
 </template>
 

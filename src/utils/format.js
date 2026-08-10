@@ -68,7 +68,7 @@ export function level_class(level) {
   return map[level] || 'text-muted'
 }
 
-/** 按路径读取嵌套值，如 get_nested(config, 'ai.enabled') */
+/** 按路径读取嵌套值，如 get_nested(config, 'webui.enabled') */
 export function get_nested(object, path) {
   return path
     .split('.')

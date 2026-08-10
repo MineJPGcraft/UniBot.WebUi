@@ -59,6 +59,12 @@ const router = createRouter({
           meta: { title: '插件管理' },
         },
         {
+          path: 'extensions',
+          name: 'ExtensionsView',
+          component: () => import('@/views/ExtensionsView.vue'),
+          meta: { title: '扩展管理' },
+        },
+        {
           path: 'adapters',
           name: 'AdaptersView',
           component: () => import('@/views/AdaptersView.vue'),

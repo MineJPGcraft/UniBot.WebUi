@@ -72,6 +72,24 @@ const tabs = [
 
 const groups = computed(() => schema.value?.groups || [])
 
+/** 当前分组对象（含 keys / gated_by 等元信息） */
+const active_group_data = computed(
+  () => groups.value.find((group) => group.name === active_group.value) || { keys: [] },
+)
+
+/** 分组是否被门控开关锁定（如「图片渲染」由 image.mode 门控，关闭时锁定） */
+const active_group_locked = computed(() => {
+  const gate_key = active_group_data.value.gated_by
+  return Boolean(gate_key) && !draft_value(gate_key)
+})
+
+/** 门控开关的显示名，用于锁定遮罩提示 */
+const active_group_gate_label = computed(() => {
+  const gate_key = active_group_data.value.gated_by
+  if (!gate_key) return ''
+  return schema.value?.fields?.find((field) => field.key === gate_key)?.label || gate_key
+})
+
 onMounted(async () => {
   try {
     await config_store.fetch_all()
@@ -209,28 +227,6 @@ function handle_json_update(key, value) {
   }
 }
 
-function keyword_entries(key) {
-  return Object.entries(draft_value(key) || {}).map(([reply, keywords]) => ({ reply, keywords }))
-}
-
-function update_keyword_entry(key, entry_index, property, value) {
-  const entries = keyword_entries(key)
-  entries[entry_index][property] = value
-  handle_update(key, Object.fromEntries(entries.map((entry) => [entry.reply, entry.keywords])))
-}
-
-function add_keyword_entry(key) {
-  const entries = keyword_entries(key)
-  entries.push({ reply: '', keywords: [] })
-  handle_update(key, Object.fromEntries(entries.map((entry) => [entry.reply, entry.keywords])))
-}
-
-function remove_keyword_entry(key, entry_index) {
-  const entries = keyword_entries(key)
-  entries.splice(entry_index, 1)
-  handle_update(key, Object.fromEntries(entries.map((entry) => [entry.reply, entry.keywords])))
-}
-
 // 列表编辑器（.env）
 function add_env_list_item(key) {
   const current = env_draft_value(key)
@@ -256,7 +252,7 @@ function display_value(value) {
   return String(value)
 }
 
-const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode', 'ai.enabled']
+const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode']
 
 async function confirm_save() {
   try {
@@ -417,14 +413,16 @@ async function confirm_messages_save() {
             <div class="card-header">
               <h3 class="card-title">{{ active_group }}</h3>
             </div>
-            <div class="field-list">
+            <div class="field-list" :class="{ 'field-list--locked': active_group_locked }">
               <div
-                v-for="field in fields_of(
-                  groups.find((g) => g.name === active_group) || { keys: [] },
-                )"
+                v-for="field in fields_of(active_group_data)"
                 :key="field.key"
                 class="field-row"
-                :class="{ 'field-row--changed': changes.some((c) => c.key === field.key) }"
+                :class="{
+                  'field-row--changed': changes.some((c) => c.key === field.key),
+                  'field-row--gate':
+                    active_group_locked && field.key === active_group_data.gated_by,
+                }"
               >
                 <div class="field-meta">
                   <label class="field-label">
@@ -516,55 +514,16 @@ async function confirm_messages_save() {
                       添加群组
                     </Button>
                   </div>
-                  <div v-else-if="field.type === 'keyword_map'" class="keyword-editor">
-                    <div
-                      v-for="(entry, entry_index) in keyword_entries(field.key)"
-                      :key="entry_index"
-                      class="keyword-entry"
-                    >
-                      <Input
-                        :model-value="entry.reply"
-                        placeholder="回复内容"
-                        @update:model-value="
-                          (value) => update_keyword_entry(field.key, entry_index, 'reply', value)
-                        "
-                      />
-                      <Input
-                        :model-value="entry.keywords.join(', ')"
-                        placeholder="关键词，用逗号分隔"
-                        @update:model-value="
-                          (value) =>
-                            update_keyword_entry(
-                              field.key,
-                              entry_index,
-                              'keywords',
-                              value
-                                .split(',')
-                                .map((item) => item.trim())
-                                .filter(Boolean),
-                            )
-                        "
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon-only
-                        @click="remove_keyword_entry(field.key, entry_index)"
-                      >
-                        <Icon icon="lucide:x" width="14" />
-                      </Button>
-                    </div>
-                    <Button variant="secondary" size="sm" @click="add_keyword_entry(field.key)">
-                      <Icon icon="lucide:plus" width="13" />
-                      添加一条规则
-                    </Button>
-                  </div>
                   <Input
                     v-else
                     :model-value="draft_value(field.key) ?? ''"
                     @update:model-value="(value) => handle_update(field.key, value)"
                   />
                 </div>
+              </div>
+              <div v-if="active_group_locked" class="field-lock-overlay" role="presentation">
+                <Icon icon="lucide:lock" width="18" />
+                <p class="field-lock-text">请先开启「{{ active_group_gate_label }}」</p>
               </div>
             </div>
           </section>
@@ -935,6 +894,7 @@ async function confirm_messages_save() {
 /* 字段行 */
 .field-list {
   padding: var(--space-2) var(--space-5);
+  position: relative;
 }
 
 .field-row {
@@ -956,6 +916,34 @@ async function confirm_messages_save() {
   padding-left: var(--space-5);
   padding-right: var(--space-5);
   border-radius: var(--radius);
+}
+
+/* 门控开关行：提升到锁定遮罩之上，保持可交互 */
+.field-row--gate {
+  position: relative;
+  z-index: 2;
+}
+
+/* 锁定遮罩：门控开关关闭时盖住不可编辑的字段 */
+.field-lock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(2px);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.field-lock-text {
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
 .field-meta {
@@ -1035,21 +1023,6 @@ async function confirm_messages_save() {
   font-size: var(--text-xs);
 }
 
-.keyword-editor {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-
-.keyword-entry {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: var(--space-1);
-  width: 100%;
-}
-
 /* diff 预览 */
 .diff-list {
   display: flex;
@@ -1102,10 +1075,6 @@ async function confirm_messages_save() {
 
   .field-control {
     width: 100%;
-  }
-
-  .keyword-entry {
-    grid-template-columns: 1fr;
   }
 }
 
