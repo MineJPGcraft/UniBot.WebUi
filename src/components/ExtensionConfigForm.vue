@@ -122,7 +122,11 @@ defineExpose({ confirm_save })
         <p v-if="property.description" class="config-desc">{{ property.description }}</p>
       </div>
       <div class="config-control">
-        <Switch v-if="field_type(property) === 'boolean'" v-model="draft[key]" :disabled="disabled" />
+        <Switch
+          v-if="field_type(property) === 'boolean'"
+          v-model="draft[key]"
+          :disabled="disabled"
+        />
         <Select
           v-else-if="field_type(property) === 'select'"
           v-model="draft[key]"
@@ -155,9 +159,17 @@ defineExpose({ confirm_save })
           placeholder="留空则不修改"
           :disabled="disabled"
         />
-        <Input v-else-if="field_type(property) === 'array'" v-model="draft[key]" :disabled="disabled" />
+        <Input
+          v-else-if="field_type(property) === 'array'"
+          v-model="draft[key]"
+          :disabled="disabled"
+        />
         <Textarea v-else-if="is_long_text(property)" v-model="draft[key]" :disabled="disabled" />
-        <Input v-else-if="field_type(property) === 'string'" v-model="draft[key]" :disabled="disabled" />
+        <Input
+          v-else-if="field_type(property) === 'string'"
+          v-model="draft[key]"
+          :disabled="disabled"
+        />
         <div v-else class="config-unsupported">暂不支持该类型</div>
       </div>
     </div>

@@ -12,9 +12,9 @@ import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
-import Input from '@/components/ui/Input.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import MarketPanel from '@/components/MarketPanel.vue'
 import ExtensionConfigDialog from '@/components/ExtensionConfigDialog.vue'
 import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
 
@@ -47,6 +47,10 @@ const toggling = ref('')
 const config_open = ref(false)
 const active_extension = ref(null)
 const market_keyword = ref('')
+/** 已应用的市场搜索关键词（点击搜索后生效） */
+const market_filter = ref('')
+/** 市场安装 / 升级操作中的扩展 id */
+const market_action = ref('')
 
 const tabs = [
   { value: 'installed', label: '已安装扩展', icon: 'lucide:puzzle' },
@@ -130,6 +134,7 @@ async function refresh_installed() {
 }
 
 async function search_market() {
+  market_filter.value = market_keyword.value
   try {
     await extension_store.fetch_market()
   } catch (error) {
@@ -137,13 +142,29 @@ async function search_market() {
   }
 }
 
+/** 扩展市场本地搜索过滤（后端接口无搜索参数） */
+const filtered_market_items = computed(() => {
+  const keyword = market_filter.value.trim().toLowerCase()
+  if (!keyword) return market_items.value
+  return market_items.value.filter(
+    (item) =>
+      (item.name || '').toLowerCase().includes(keyword) ||
+      (item.id || '').toLowerCase().includes(keyword) ||
+      (item.description || '').toLowerCase().includes(keyword),
+  )
+})
+
 async function install_market_extension(item) {
+  market_action.value = item.id
   try {
     await extension_store.install_market(item.id)
     toast.success(`扩展 ${item.name} 安装成功，重启后生效`)
+    await search_market()
     ask_restart(`扩展 ${item.name} 安装成功，需要重启机器人生效，是否立即重启？`)
   } catch (error) {
     toast.error(error.message || '安装失败')
+  } finally {
+    market_action.value = ''
   }
 }
 
@@ -325,66 +346,21 @@ async function change_template(name) {
       </template>
 
       <template #market>
-        <div class="card market-panel">
-          <form class="market-toolbar" @submit.prevent="search_market">
-            <Input
-              v-model="market_keyword"
-              class="market-search"
-              placeholder="搜索扩展…"
-              @keydown.enter="search_market"
-            />
-            <Button variant="secondary" type="submit" :loading="market_loading">
-              <Icon icon="lucide:search" width="14" />
-              搜索
-            </Button>
-          </form>
-
-          <div v-if="market_loading" class="loading-block"><Spinner :size="18" /> 加载中…</div>
-          <EmptyState
-            v-else-if="market_items.length === 0"
-            icon="lucide:store"
-            title="扩展市场为空"
-            description="暂无可用扩展，或网络连接异常"
-          />
-          <div v-else class="extension-grid market-grid">
-            <article v-for="item in market_items" :key="item.id" class="extension-card card">
-              <div class="extension-head">
-                <div class="extension-icon"><Icon icon="lucide:package" width="18" /></div>
-                <div class="extension-title">
-                  <h3>{{ item.name }}</h3>
-                  <span class="extension-id mono">{{ item.id }}</span>
-                </div>
-                <Badge v-if="item.installed" variant="neutral">已安装</Badge>
-              </div>
-
-              <p class="extension-desc">{{ item.description || '暂无描述' }}</p>
-
-              <div class="extension-foot">
-                <div class="extension-meta">
-                  <span class="mono">v{{ item.latest_version }}</span>
-                  <span v-if="item.repo" class="text-muted">· {{ item.repo }}</span>
-                </div>
-                <div class="extension-actions">
-                  <template v-if="auth_store.is_admin">
-                    <Button
-                      v-if="item.installed"
-                      variant="secondary"
-                      size="sm"
-                      @click="install_market_extension(item)"
-                    >
-                      <Icon icon="lucide:refresh-cw" width="13" />
-                      升级
-                    </Button>
-                    <Button v-else size="sm" @click="install_market_extension(item)">
-                      <Icon icon="lucide:download" width="13" />
-                      安装
-                    </Button>
-                  </template>
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
+        <MarketPanel
+          :model-value="market_keyword"
+          :items="filtered_market_items"
+          :loading="market_loading"
+          placeholder="搜索扩展…"
+          empty-title="扩展市场为空"
+          empty-description="暂无可用扩展，或网络连接异常"
+          item-icon="lucide:package"
+          :busy="market_action"
+          :show-actions="auth_store.is_admin"
+          @update:model-value="(value) => (market_keyword = value)"
+          @search="search_market"
+          @install="install_market_extension"
+          @upgrade="install_market_extension"
+        />
       </template>
 
       <template #render>
@@ -442,10 +418,7 @@ async function change_template(name) {
             >
               <div class="render-config-head">
                 <div class="render-config-title">
-                  <span
-                    class="render-config-kind"
-                    :class="`render-config-kind--${item.kind}`"
-                  >
+                  <span class="render-config-kind" :class="`render-config-kind--${item.kind}`">
                     <Icon
                       :icon="item.kind === 'renderer' ? 'lucide:image' : 'lucide:layout-template'"
                       width="14"
@@ -457,7 +430,10 @@ async function change_template(name) {
                     {{ item.kind === 'renderer' ? '渲染器' : '模板' }}
                   </Badge>
                   <Badge :variant="item.available ? 'success' : 'neutral'">
-                    <Icon :icon="item.available ? 'lucide:circle-check' : 'lucide:circle-off'" width="11" />
+                    <Icon
+                      :icon="item.available ? 'lucide:circle-check' : 'lucide:circle-off'"
+                      width="11"
+                    />
                     {{ item.available ? '可用' : '已禁用' }}
                   </Badge>
                   <Badge v-if="item.current" variant="accent">
@@ -477,7 +453,9 @@ async function change_template(name) {
                 @save="(values) => save_render_plugin_config(item, values)"
               />
             </div>
-            <div v-if="!visible_render_configs.length" class="render-config-empty">暂无渲染插件</div>
+            <div v-if="!visible_render_configs.length" class="render-config-empty">
+              暂无渲染插件
+            </div>
           </div>
         </div>
       </template>
@@ -738,27 +716,6 @@ async function change_template(name) {
 
 .render-panel :deep(.ui-select-trigger) {
   width: 220px;
-}
-
-.market-panel {
-  margin-top: var(--space-4);
-  padding: var(--space-5);
-}
-
-.market-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.market-search {
-  flex: 1;
-  max-width: 320px;
-}
-
-.market-grid {
-  margin-top: 0;
 }
 
 .extension-actions .danger {

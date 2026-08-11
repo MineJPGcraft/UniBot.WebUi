@@ -45,4 +45,3 @@ function on_confirm() {
     />
   </Dialog>
 </template>
-
