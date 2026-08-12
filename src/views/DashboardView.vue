@@ -10,6 +10,7 @@ import { use_websocket } from '@/composables/use_websocket'
 import Badge from '@/components/ui/Badge.vue'
 import Progress from '@/components/ui/Progress.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import SetupGuide from '@/components/SetupGuide.vue'
 import { format_uptime, level_class, format_mb } from '@/utils/format'
 import { server_type_icon, server_type_label } from '@/utils/server'
 
@@ -85,6 +86,9 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+
+    <!-- 快速开始引导 -->
+    <SetupGuide />
 
     <div class="dashboard-grid">
       <!-- 服务器一览 -->
