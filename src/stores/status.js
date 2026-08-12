@@ -27,6 +27,12 @@ export const useStatusStore = defineStore('status', () => {
     return data
   }
 
+  /** 获取当前认证令牌（用于快速授权初始化） */
+  async function fetch_token() {
+    const data = await http.get('/api/status/token')
+    return data?.token ?? ''
+  }
+
   /** 订阅 WebSocket 的 status 事件推送（断线重连后自动恢复订阅） */
   function init() {
     if (unsubscribe) return
@@ -41,5 +47,5 @@ export const useStatusStore = defineStore('status', () => {
     unsubscribe = null
   }
 
-  return { status, loading, fetch_status, check_update, init, dispose }
+  return { status, loading, fetch_status, check_update, fetch_token, init, dispose }
 })

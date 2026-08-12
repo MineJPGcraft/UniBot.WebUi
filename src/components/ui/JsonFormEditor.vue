@@ -175,7 +175,10 @@ function update_object_field(item, field, schema_index, key, field_value) {
 
 function booleans_entries(schema_index, field) {
   const obj = value.value?.[schema_index]?.[field.key] || {}
-  return (field.fields || []).map((bfield) => [bfield, obj[bfield.key] ?? Boolean(bfield.default ?? false)])
+  return (field.fields || []).map((bfield) => [
+    bfield,
+    obj[bfield.key] ?? Boolean(bfield.default ?? false),
+  ])
 }
 
 /** 统计布尔组已开启 / 总数 */
@@ -307,7 +310,10 @@ function add_map_field_value_list(schema_index, field, index) {
   <!-- ===== array 编辑器 ===== -->
   <div v-if="form.kind === 'array'" class="jfe jfe--array">
     <div v-for="(item, index) in array_items()" :key="index" class="jfe-item">
-      <div class="jfe-item__head" :class="{ 'jfe-item__head--collapsed': item_collapsed[index] !== false }">
+      <div
+        class="jfe-item__head"
+        :class="{ 'jfe-item__head--collapsed': item_collapsed[index] !== false }"
+      >
         <button class="jfe-item__title" type="button" @click="toggle_item(index)">
           <Icon
             :icon="item_collapsed[index] ? 'lucide:chevron-down' : 'lucide:chevron-up'"
@@ -337,7 +343,13 @@ function add_map_field_value_list(schema_index, field, index) {
           >
             <Icon icon="lucide:arrow-down" width="14" />
           </Button>
-          <Button variant="ghost" size="sm" icon-only title="删除" @click="remove_array_item(index)">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon-only
+            title="删除"
+            @click="remove_array_item(index)"
+          >
             <Icon icon="lucide:trash-2" width="14" />
           </Button>
         </div>
@@ -386,7 +398,9 @@ function add_map_field_value_list(schema_index, field, index) {
               <template #trigger>
                 <span class="jfe-collapse__title">{{ field.label }}</span>
                 <span class="jfe-collapse__count">
-                  已开启 {{ booleans_count(index, field).opened }}/{{ booleans_count(index, field).total }}
+                  已开启 {{ booleans_count(index, field).opened }}/{{
+                    booleans_count(index, field).total
+                  }}
                 </span>
               </template>
               <template #content>
@@ -399,7 +413,9 @@ function add_map_field_value_list(schema_index, field, index) {
                   >
                     <Switch
                       :model-value="bchecked"
-                      @update:model-value="(v) => update_object_field(item, field, index, bfield.key, v)"
+                      @update:model-value="
+                        (v) => update_object_field(item, field, index, bfield.key, v)
+                      "
                     />
                     <span class="jfe-boolean__text">{{ bfield.label }}</span>
                   </label>
