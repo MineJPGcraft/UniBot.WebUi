@@ -60,6 +60,7 @@ defineProps({
 }
 
 .ui-tabs-content {
+  margin-top: var(--space-4);
   outline: none;
 }
 

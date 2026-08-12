@@ -15,6 +15,7 @@ import Dialog from '@/components/ui/Dialog.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
+import JsonFormEditor from '@/components/ui/JsonFormEditor.vue'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -595,8 +596,13 @@ async function confirm_messages_save() {
                 </div>
 
                 <div class="field-control">
+                  <Switch
+                    v-if="field.type === 'boolean'"
+                    :model-value="Boolean(env_draft_value(field.key))"
+                    @update:model-value="(value) => handle_env_update(field.key, value)"
+                  />
                   <Input
-                    v-if="field.type === 'secret'"
+                    v-else-if="field.type === 'secret'"
                     type="password"
                     :model-value="env_draft_value(field.key) ?? ''"
                     placeholder="留空则不修改"
@@ -635,14 +641,22 @@ async function confirm_messages_save() {
                     </Button>
                   </div>
                   <div v-else-if="field.type === 'json'" class="json-editor">
-                    <Textarea
-                      :model-value="json_value(field.key)"
-                      :rows="6"
-                      @update:model-value="(value) => handle_json_update(field.key, value)"
+                    <JsonFormEditor
+                      v-if="field.form"
+                      :form="field.form"
+                      :model-value="env_draft_value(field.key)"
+                      @update:model-value="(value) => handle_env_update(field.key, value)"
                     />
-                    <span v-if="json_errors[field.key]" class="json-error">{{
-                      json_errors[field.key]
-                    }}</span>
+                    <template v-else>
+                      <Textarea
+                        :model-value="json_value(field.key)"
+                        :rows="6"
+                        @update:model-value="(value) => handle_json_update(field.key, value)"
+                      />
+                      <span v-if="json_errors[field.key]" class="json-error">{{
+                        json_errors[field.key]
+                      }}</span>
+                    </template>
                   </div>
                   <Input
                     v-else
@@ -739,7 +753,7 @@ async function confirm_messages_save() {
       "
       confirm-text="保存修改"
       :loading="raw_saving"
-      width="min(960px, calc(100vw - 32px))"
+      width="70vw"
       @confirm="confirm_raw_save"
     >
       <div v-if="raw_loading" class="raw-loading">
@@ -976,7 +990,8 @@ async function confirm_messages_save() {
 }
 
 .field-control {
-  width: 320px;
+  width: 40%;
+  flex: 0 0 40%;
   flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
@@ -1083,7 +1098,7 @@ async function confirm_messages_save() {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
-  margin: var(--space-4) 0;
+  margin-bottom: var(--space-4);
 }
 
 .tab-actions .tab-action-left {

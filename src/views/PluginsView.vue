@@ -233,11 +233,9 @@ async function refresh_after_market_action() {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-4);
-  margin-top: var(--space-4);
 }
 
 .plugin-empty-hint {
-  margin-top: var(--space-4);
   padding: var(--space-6) 0;
   text-align: center;
   font-size: var(--text-sm);

@@ -21,6 +21,7 @@ defineProps({
   confirmVariant: { type: String, default: 'primary' },
   loading: { type: Boolean, default: false },
   hideFooter: { type: Boolean, default: false },
+  width: { type: String, default: 'min(480px, calc(100vw - 32px))' },
 })
 
 defineEmits(['confirm'])
@@ -35,6 +36,7 @@ defineEmits(['confirm'])
       <DialogOverlay class="ui-dialog-overlay" />
       <DialogContent
         class="ui-dialog-content"
+        :style="{ width }"
         :aria-describedby="description ? 'dialog-description' : undefined"
       >
         <DialogTitle class="ui-dialog-title">{{ title }}</DialogTitle>
@@ -71,7 +73,6 @@ defineEmits(['confirm'])
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(480px, calc(100vw - 32px));
   max-height: 85vh;
   overflow-y: auto;
   background: var(--surface);

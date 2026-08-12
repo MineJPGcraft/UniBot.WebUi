@@ -478,7 +478,6 @@ async function change_template(name) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-4);
-  margin-top: var(--space-4);
 }
 
 .extension-card {
@@ -576,7 +575,6 @@ async function change_template(name) {
 }
 
 .render-panel {
-  margin-top: var(--space-4);
   padding: 0 var(--space-5);
 }
 

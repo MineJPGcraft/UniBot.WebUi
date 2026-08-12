@@ -224,10 +224,6 @@ function upgrade(item) {
 </template>
 
 <style scoped>
-.market-panel {
-  margin-top: var(--space-4);
-}
-
 .market-toolbar {
   display: flex;
   align-items: center;
