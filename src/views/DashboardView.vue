@@ -12,6 +12,7 @@ import Progress from '@/components/ui/Progress.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SetupGuide from '@/components/SetupGuide.vue'
 import { format_uptime, level_class, format_mb } from '@/utils/format'
+import { ansi_to_html } from '@/utils/ansi'
 import { server_type_icon, server_type_label } from '@/utils/server'
 
 const router = useRouter()
@@ -155,11 +156,18 @@ onMounted(async () => {
             :key="log.seq || `${log.time}-${index}`"
             class="log-row"
           >
-            <span class="log-time mono">{{ log.time }}</span>
-            <span class="log-level mono" :class="level_class(log.level)">
-              {{ log.level || '—' }}
-            </span>
-            <span class="log-message">{{ log.message }}</span>
+            <!-- 新推送带 ANSI 彩色行：整行渲染（含级别颜色与模块名天蓝下划线） -->
+            <template v-if="log.ansi">
+              <span class="log-ansi" v-html="ansi_to_html(log.ansi)" />
+            </template>
+            <!-- 旧缓存无 ANSI：回退分列渲染 -->
+            <template v-else>
+              <span class="log-time mono">{{ log.time }}</span>
+              <span class="log-level mono" :class="level_class(log.level)">
+                {{ log.level || '—' }}
+              </span>
+              <span class="log-message">{{ log.message }}</span>
+            </template>
           </div>
         </div>
       </section>
@@ -378,6 +386,11 @@ onMounted(async () => {
 .log-message {
   color: var(--text-secondary);
   word-break: break-all;
+}
+
+.log-ansi {
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .more-link {

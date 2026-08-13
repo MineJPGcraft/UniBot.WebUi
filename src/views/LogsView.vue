@@ -12,6 +12,7 @@ import Pagination from '@/components/ui/Pagination.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { format_bytes, format_datetime, level_class } from '@/utils/format'
+import { ansi_to_html } from '@/utils/ansi'
 
 const log_store = useLogStore()
 const toast = use_toast()
@@ -255,10 +256,17 @@ async function handle_page_change(target_page) {
           :key="log.seq || `${log.time}-${index}`"
           class="log-line"
         >
-          <span class="log-time mono">{{ log.time }}</span>
-          <span class="log-level mono" :class="level_class(log.level)">{{ log.level }}</span>
-          <span class="log-module mono">{{ log.module }}</span>
-          <span class="log-message">{{ log.message }}</span>
+          <!-- 新推送带 ANSI 彩色行：整行渲染（含级别颜色与模块名天蓝下划线） -->
+          <template v-if="log.ansi">
+            <span class="log-ansi" v-html="ansi_to_html(log.ansi)" />
+          </template>
+          <!-- 旧缓存无 ANSI：回退分列渲染 -->
+          <template v-else>
+            <span class="log-time mono">{{ log.time }}</span>
+            <span class="log-level mono" :class="level_class(log.level)">{{ log.level }}</span>
+            <span class="log-module mono">{{ log.module }}</span>
+            <span class="log-message">{{ log.message }}</span>
+          </template>
         </div>
       </div>
     </section>
@@ -499,6 +507,11 @@ async function handle_page_change(target_page) {
 .log-message {
   color: var(--text-secondary);
   word-break: break-all;
+}
+
+.log-ansi {
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .live-empty {
