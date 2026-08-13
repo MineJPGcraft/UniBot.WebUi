@@ -31,6 +31,10 @@ export const useExtensionStore = defineStore('extension', () => {
   const market_items = ref([])
   const market_loading = ref(false)
 
+  // 图片模式依赖扩展（渲染引擎 + 默认模板包）的下载情况
+  const image_requirements = ref(null)
+  const image_requirements_loading = ref(false)
+
   async function fetch_installed() {
     loading.value = true
     try {
@@ -144,6 +148,17 @@ export const useExtensionStore = defineStore('extension', () => {
     await fetch_installed()
   }
 
+  /** 获取图片模式依赖扩展（Html2Pic / Default）的下载情况 */
+  async function fetch_image_requirements() {
+    image_requirements_loading.value = true
+    try {
+      image_requirements.value = await http.get('/api/extensions/image-requirements')
+      return image_requirements.value
+    } finally {
+      image_requirements_loading.value = false
+    }
+  }
+
   return {
     installed_list,
     loading,
@@ -161,6 +176,8 @@ export const useExtensionStore = defineStore('extension', () => {
     saving_render_config,
     market_items,
     market_loading,
+    image_requirements,
+    image_requirements_loading,
     fetch_installed,
     fetch_detail,
     fetch_config,
@@ -175,5 +192,6 @@ export const useExtensionStore = defineStore('extension', () => {
     fetch_market,
     install_market,
     uninstall_extension,
+    fetch_image_requirements,
   }
 })

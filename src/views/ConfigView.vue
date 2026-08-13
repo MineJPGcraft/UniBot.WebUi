@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
+import { useExtensionStore } from '@/stores/extension'
 import { use_toast } from '@/composables/use_toast'
 import { use_restart } from '@/composables/use_restart'
 import Button from '@/components/ui/Button.vue'
@@ -19,6 +20,7 @@ import JsonFormEditor from '@/components/ui/JsonFormEditor.vue'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
+const extension_store = useExtensionStore()
 const toast = use_toast()
 const { ask_restart } = use_restart()
 const {
@@ -255,12 +257,72 @@ function display_value(value) {
 
 const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode']
 
+// 图片模式依赖扩展（Html2Pic / Default）自动下载引导
+const image_deps_dialog_open = ref(false)
+const image_deps_missing = ref([])
+const image_deps_not_in_market = ref([])
+const image_deps_installing = ref(false)
+
+const image_deps_confirm_text = computed(() =>
+  image_deps_missing.value.length > 0 ? '自动下载并安装' : '知道了',
+)
+
+/** 检查图片模式依赖扩展，缺失时弹窗询问是否自动下载，返回是否弹出了对话框 */
+async function prompt_image_deps() {
+  try {
+    const req = await extension_store.fetch_image_requirements()
+    const missing_items = (req?.required || []).filter((item) => !item.installed)
+    if (missing_items.length === 0) return false
+    image_deps_missing.value = missing_items.filter((item) => item.in_market)
+    image_deps_not_in_market.value = missing_items.filter((item) => !item.in_market)
+    image_deps_dialog_open.value = true
+    return true
+  } catch (error) {
+    toast.error(error.message || '检查图片模式依赖失败')
+    return false
+  }
+}
+
+/** 从市场自动下载缺失的图片模式依赖扩展 */
+async function install_image_deps() {
+  image_deps_installing.value = true
+  try {
+    for (const item of image_deps_missing.value) {
+      await extension_store.install_market(item.id)
+    }
+    image_deps_dialog_open.value = false
+    toast.success('图片模式依赖扩展已下载，重启后生效')
+    ask_restart('图片模式依赖扩展已下载，需要重启机器人生效，是否立即重启？')
+  } catch (error) {
+    toast.error(error.message || '下载扩展失败')
+  } finally {
+    image_deps_installing.value = false
+  }
+}
+
+/** 依赖弹窗确认：无可自动下载项时仅关闭 */
+async function confirm_image_deps() {
+  if (image_deps_missing.value.length === 0) {
+    image_deps_dialog_open.value = false
+    return
+  }
+  await install_image_deps()
+}
+
 async function confirm_save() {
   try {
     const changed_keys = changes.value.map((change) => change.key)
+    // 图片模式由关闭切到开启时，检查依赖扩展是否已下载
+    const image_mode_turned_on = changes.value.some(
+      (change) => change.key === 'image.mode' && change.new_value === true,
+    )
     await config_store.save_changes()
     toast.success('配置已保存并热更新')
     diff_open.value = false
+    if (image_mode_turned_on) {
+      const prompted = await prompt_image_deps()
+      if (prompted) return // 依赖下载流程内部处理重启提示
+    }
     if (changed_keys.some((key) => RESTART_DEPENDENT_KEYS.includes(key))) {
       ask_restart('WebUI / 图片渲染 / AI 的启停需要重启机器人生效，是否立即重启？')
     }
@@ -842,6 +904,38 @@ async function confirm_messages_save() {
         </li>
       </ul>
     </Dialog>
+
+    <!-- 图片模式依赖扩展自动下载引导 -->
+    <Dialog
+      v-model="image_deps_dialog_open"
+      title="安装图片模式依赖扩展"
+      description="图片模式需要渲染引擎与模板包，以下扩展尚未下载"
+      :confirm-text="image_deps_confirm_text"
+      cancel-text="稍后再说"
+      :loading="image_deps_installing"
+      @confirm="confirm_image_deps"
+    >
+      <div class="image-deps-list">
+        <div v-for="item in image_deps_missing" :key="item.id" class="image-dep-item">
+          <Icon icon="lucide:download" width="15" class="text-muted" />
+          <span>{{ item.name }}</span>
+          <span class="mono text-muted">{{ item.id }}</span>
+        </div>
+        <div v-if="image_deps_not_in_market.length > 0" class="image-dep-warning">
+          <Icon icon="lucide:triangle-alert" width="15" />
+          <span>
+            以下扩展不在市场中，无法自动下载，请手动安装：
+            <span
+              v-for="item in image_deps_not_in_market"
+              :key="item.id"
+              class="mono image-dep-inline"
+            >
+              {{ item.name }}（{{ item.id }}）
+            </span>
+          </span>
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -1076,6 +1170,41 @@ async function confirm_messages_save() {
 .diff-new {
   color: var(--success);
   font-weight: 600;
+}
+
+/* 图片模式依赖扩展引导 */
+.image-deps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.image-dep-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+.image-dep-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--warning-soft, rgb(250 204 21 / 0.1));
+  border: 1px solid var(--warning, #ca8a04);
+  border-radius: var(--radius);
+  color: var(--warning, #ca8a04);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.image-dep-inline {
+  margin-left: var(--space-1);
 }
 
 @media (max-width: 900px) {
