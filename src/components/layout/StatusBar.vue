@@ -1,13 +1,18 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useStatusStore } from '@/stores/status'
+import { use_poem } from '@/composables/use_poem'
 import { format_uptime, format_mb } from '@/utils/format'
 
 const status_store = useStatusStore()
 const { status } = storeToRefs(status_store)
 
 const uptime_text = computed(() => format_uptime(status.value?.uptime))
+
+const { poem, loading, load_poem } = use_poem()
+
+onMounted(load_poem)
 </script>
 
 <template>
@@ -19,6 +24,10 @@ const uptime_text = computed(() => format_uptime(status.value?.uptime))
     <span>内存 {{ format_mb(status?.memory_mb) }}</span>
     <span class="statusbar-sep">·</span>
     <span>CPU {{ status?.cpu_percent ?? '—' }}%</span>
+    <span v-if="loading" class="statusbar-poem">正在加载诗词…</span>
+    <span v-else-if="poem" class="statusbar-poem" title="点击换一句" @click="load_poem()">
+      {{ poem }}
+    </span>
   </footer>
 </template>
 
@@ -38,5 +47,19 @@ const uptime_text = computed(() => format_uptime(status.value?.uptime))
 
 .statusbar-sep {
   color: var(--border-strong);
+}
+
+.statusbar-poem {
+  margin-left: auto;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 150ms ease-out;
+}
+
+.statusbar-poem:hover {
+  color: var(--accent);
 }
 </style>
