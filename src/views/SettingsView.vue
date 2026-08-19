@@ -27,6 +27,7 @@ const avatar_text = computed(() =>
 )
 
 const checking_update = ref(false)
+const updating = ref(false)
 
 const update_hint = computed(() => {
   if (!status.value?.latest_version) return null
@@ -49,6 +50,18 @@ async function check_update() {
     toast.error(error.message || '检测失败')
   } finally {
     checking_update.value = false
+  }
+}
+
+async function update_bot() {
+  updating.value = true
+  try {
+    await status_store.update_bot()
+    toast.success('更新成功，机器人正在重启')
+  } catch (error) {
+    toast.error(error.message || '更新失败')
+  } finally {
+    updating.value = false
   }
 }
 
@@ -218,16 +231,28 @@ async function save_password() {
             <span class="pulse-dot" />
             已运行 {{ format_uptime(status?.uptime) }}
           </span>
-          <button
-            v-if="auth_store.is_admin"
-            class="check-update-button"
-            type="button"
-            :disabled="checking_update"
-            @click="check_update"
-          >
-            <Icon icon="lucide:refresh-cw" width="13" :class="{ spinning: checking_update }" />
-            检测更新
-          </button>
+          <div class="about-banner-actions">
+            <button
+              v-if="auth_store.is_admin && status?.has_update"
+              class="update-button"
+              type="button"
+              :disabled="updating"
+              @click="update_bot"
+            >
+              <Icon icon="lucide:download" width="13" :class="{ spinning: updating }" />
+              立即更新
+            </button>
+            <button
+              v-if="auth_store.is_admin"
+              class="check-update-button"
+              type="button"
+              :disabled="checking_update"
+              @click="check_update"
+            >
+              <Icon icon="lucide:refresh-cw" width="13" :class="{ spinning: checking_update }" />
+              检测更新
+            </button>
+          </div>
         </div>
       </div>
 
@@ -467,7 +492,14 @@ async function save_password() {
   gap: var(--space-2);
 }
 
-.check-update-button {
+.about-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.check-update-button,
+.update-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -482,19 +514,33 @@ async function save_password() {
     color var(--transition);
 }
 
-.check-update-button:hover:not(:disabled) {
+.check-update-button:hover:not(:disabled),
+.update-button:hover:not(:disabled) {
   background: var(--accent-soft);
   color: var(--accent);
 }
 
-.check-update-button:focus-visible {
+.check-update-button:focus-visible,
+.update-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.check-update-button:disabled {
+.check-update-button:disabled,
+.update-button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.update-button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.update-button:hover:not(:disabled) {
+  background: var(--accent-strong);
+  color: #ffffff;
 }
 
 .spinning {

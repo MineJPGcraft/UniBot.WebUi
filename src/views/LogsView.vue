@@ -213,7 +213,7 @@ async function handle_page_change(target_page) {
             <span class="log-level mono" :class="level_class(item.level)">{{ item.level }}</span>
             <span class="log-message">
               <span class="log-module mono">{{ item.module }}</span>
-               {{ item.message }}
+              {{ item.message }}
             </span>
           </div>
         </div>

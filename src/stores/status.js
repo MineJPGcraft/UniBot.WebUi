@@ -27,6 +27,12 @@ export const useStatusStore = defineStore('status', () => {
     return data
   }
 
+  /** 从 GitHub Release 更新机器人（成功后后端会触发重启） */
+  async function update_bot() {
+    const data = await http.post('/api/status/update', {})
+    return data
+  }
+
   /** 获取当前认证令牌（用于快速授权初始化） */
   async function fetch_token() {
     const data = await http.get('/api/status/token')
@@ -47,5 +53,5 @@ export const useStatusStore = defineStore('status', () => {
     unsubscribe = null
   }
 
-  return { status, loading, fetch_status, check_update, fetch_token, init, dispose }
+  return { status, loading, fetch_status, check_update, update_bot, fetch_token, init, dispose }
 })
