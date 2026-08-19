@@ -1,6 +1,7 @@
 /**
  * 日志 Store：文件列表 + 内容分页过滤
- * 正则解析 loguru 格式：2026-07-23 13:51:27.725 | SUCCESS  | module:line - message
+ * 正则解析文件日志格式（Scripts/Logging.py file_format）：
+ *   MM-DD HH:mm:ss [LEVEL] module | message
  */
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
@@ -8,7 +9,7 @@ import { http } from '@/utils/http'
 import { use_websocket } from '@/composables/use_websocket'
 
 const LOG_LINE_PATTERN =
-  /^(?<date>\d{4}-\d{2}-\d{2})\s+(?<time>\d{2}:\d{2}:\d{2}\.\d+)\s*\|\s*(?<level>\w+)\s*\|\s*(?<module>[^-]+?)\s*-\s*(?<message>.*)$/
+  /^(?<date>\d{2}-\d{2})\s+(?<time>\d{2}:\d{2}:\d{2})\s*\[(?<level>\w+)\]\s*(?<module>[^|]+?)\s*\|\s*(?<message>.*)$/
 
 /** 实时日志缓存上限（跨页面共享，超出后丢弃最早的） */
 const MAX_LIVE_LOGS = 500
@@ -18,14 +19,14 @@ function parse_line(raw) {
   if (match) {
     return {
       line: raw.line,
-      date: match.groups.date,
-      time: match.groups.time,
+      // 只保留到分钟（HH:mm），省略日期与秒，便于各列对齐
+      time: match.groups.time.slice(0, 5),
       level: match.groups.level,
       module: match.groups.module.trim(),
       message: match.groups.message,
     }
   }
-  return { line: raw.line, date: '', time: '', level: '', module: '', message: raw.text }
+  return { line: raw.line, time: '', level: '', module: '', message: raw.text }
 }
 
 export const useLogStore = defineStore('log', () => {

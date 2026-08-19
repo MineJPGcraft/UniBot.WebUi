@@ -55,20 +55,20 @@ async function check_update() {
 const about_links = [
   {
     label: '官方网站',
-    value: 'qqbot.bugjump.xyz',
-    url: 'https://qqbot.bugjump.xyz/',
+    value: 'bot.mcjpg.dev',
+    url: 'https://bot.mcjpg.dev/',
     icon: 'lucide:globe',
   },
   {
     label: '项目地址',
-    value: 'github.com/Minecraft-QQBot',
-    url: 'https://github.com/Minecraft-QQBot',
+    value: 'github.com/MineJPGcraft/UniBot',
+    url: 'https://github.com/MineJPGcraft/UniBot',
     icon: 'lucide:github',
   },
   {
     label: 'QQ 交流群',
     value: '962802248',
-    url: 'https://qm.qq.com/q/B3kmvJl2xO',
+    url: 'https://qm.qq.com/q/qyq2XH6qkw',
     icon: 'lucide:users',
   },
 ]
@@ -246,7 +246,7 @@ async function save_password() {
         <a
           v-if="update_hint.variant === 'warning'"
           class="about-update-link"
-          href="https://github.com/Minecraft-UniBot/UniBot/releases/latest"
+          href="https://github.com/MineJPGcraft/UniBot/releases/latest"
           target="_blank"
           rel="noopener noreferrer"
         >

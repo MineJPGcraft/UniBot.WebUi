@@ -207,20 +207,15 @@ async function handle_page_change(target_page) {
           <EmptyState icon="lucide:search-x" title="没有匹配的日志行" />
         </div>
         <div v-else class="log-content">
-          <template v-for="item in log_items">
-            <div v-if="item.level" class="log-line" :key="item.line">
-              <span class="line-no">{{ item.line }}</span>
-              <span class="log-time mono">{{ item.time }}</span>
-              <span class="log-level mono" :class="level_class(item.level)">
-                {{ item.level }}
-              </span>
-              <span class="log-message">{{ item.message }}</span>
-            </div>
-            <div v-else class="log-line log-line" :key="item.line + 500">
-              <span class="line-no">{{ item.line }}</span>
-              <span class="log-message">{{ item.message }}</span>
-            </div>
-          </template>
+          <div v-for="item in log_items" :key="item.line" class="log-line">
+            <span class="line-no">{{ item.line }}</span>
+            <span class="log-time mono">{{ item.time }}</span>
+            <span class="log-level mono" :class="level_class(item.level)">{{ item.level }}</span>
+            <span class="log-message">
+              <span class="log-module mono">{{ item.module }}</span>
+               {{ item.message }}
+            </span>
+          </div>
         </div>
 
         <div v-if="total > 0" class="content-footer">
@@ -472,12 +467,12 @@ async function handle_page_change(target_page) {
 
 .log-line {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: 1px 0;
 }
 
 .line-no {
-  width: 44px;
+  width: 32px;
   text-align: right;
   color: var(--border-strong);
   flex-shrink: 0;
@@ -485,23 +480,20 @@ async function handle_page_change(target_page) {
 }
 
 .log-time {
+  /* HH:mm 共 5 字符，固定宽度保证各列对齐 */
+  width: 40px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .log-level {
-  width: 60px;
+  width: 55px;
   flex-shrink: 0;
   font-weight: 600;
 }
 
 .log-module {
   color: var(--text-muted);
-  flex-shrink: 0;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .log-message {
