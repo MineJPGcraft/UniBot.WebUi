@@ -99,7 +99,7 @@ const steps = computed(() => [
     icon: 'lucide:server',
     action_label: '查看文档',
     done: server_ready.value,
-    target: 'https://bot.mcjpg.dev/queqiao/',
+    target: 'https://bot.mcjpg.dev/adapter/',
   },
   {
     key: 'superuser',
