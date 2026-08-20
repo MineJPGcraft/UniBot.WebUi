@@ -21,10 +21,17 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
 })
 
+// reka-ui 的 SelectItem 值不允许为空字符串（空串是「清除选择、显示占位符」的保留值）。
+// 枚举里可能混入 ''（如扩展配置的「未选择」态），渲染前过滤掉，避免组件抛错；
+// 模型值仍可为 ''，此时触发区正常显示占位符。
+const visible_options = computed(() =>
+  props.options.filter((option) => String(option.value) !== ''),
+)
+
 // 自行从 options 同步计算展示文本，避免依赖 reka-ui 内部 optionsSet
 // 的注册时机导致的「先显示占位符再变回真实值」闪烁。
 const selected_label = computed(() => {
-  const option = props.options.find((item) => String(item.value) === String(model.value))
+  const option = visible_options.value.find((item) => String(item.value) === String(model.value))
   return option ? option.label : ''
 })
 </script>
@@ -43,7 +50,7 @@ const selected_label = computed(() => {
       <SelectContent class="ui-select-content" position="popper" :side-offset="4">
         <SelectViewport>
           <SelectItem
-            v-for="option in options"
+            v-for="option in visible_options"
             :key="option.value"
             class="ui-select-item"
             :value="option.value"
