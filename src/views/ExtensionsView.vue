@@ -58,9 +58,10 @@ const tabs = [
   { value: 'render', label: '渲染设置', icon: 'lucide:image' },
 ]
 
-const current_renderer = computed(
-  () => (renderers.value.find((item) => item.current) || renderers.value[0] || {}).name || '',
-)
+const current_renderer = computed(() => {
+  const matched = renderers.value.find((item) => item.current)
+  return (matched || {}).name || ''
+})
 
 /** 引擎下拉只列当前可用的渲染插件 */
 const renderer_options = computed(() =>
