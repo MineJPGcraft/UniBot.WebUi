@@ -15,12 +15,13 @@
  *   - object(kind=map)      : 键值对编辑器（如 Discord 的 application_commands）
  */
 
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import Input from './Input.vue'
 import Button from './Button.vue'
 import Switch from './Switch.vue'
 import Collapsible from './Collapsible.vue'
+import QrScanDialog from './QrScanDialog.vue'
 
 const props = defineProps({
   /** 后端提供的 form 结构 */
@@ -38,6 +39,36 @@ const collapse_open = reactive({})
 
 /** 卡片折叠状态：key = item index。false = 展开；undefined/true = 收起（默认收起） */
 const item_collapsed = reactive({})
+
+/** 扫码弹窗状态：key = item index */
+const qr_scan_open = reactive({})
+
+/** 扫码成功后回填的字段（由 form.qr_connect 指定） */
+function apply_qr_result(index, credentials) {
+  console.log(1234)
+  const qr_config = props.form.qr_connect
+  if (!qr_config) return
+  const items = clone(array_items())
+  const item = items[index] || {}
+  if (qr_config.id_key && credentials.app_id) {
+    item[qr_config.id_key] = credentials.app_id
+  }
+  if (qr_config.secret_key && credentials.app_secret) {
+    item[qr_config.secret_key] = credentials.app_secret
+  }
+  items[index] = item
+  update(items)
+  // 扫码成功后展开卡片，方便用户查看/补充其他字段
+  item_collapsed[index] = false
+}
+
+function open_qr_scan(index) {
+  qr_scan_open[index] = true
+}
+
+function close_qr_scan(index) {
+  qr_scan_open[index] = false
+}
 
 function toggle_item(index) {
   item_collapsed[index] = item_collapsed[index] === false ? true : false
@@ -324,6 +355,16 @@ function add_map_field_value_list(schema_index, field, index) {
         </button>
         <div class="jfe-item__actions">
           <Button
+            v-if="form.qr_connect"
+            variant="ghost"
+            size="sm"
+            icon-only
+            title="扫码快速绑定"
+            @click="open_qr_scan(index)"
+          >
+            <Icon icon="lucide:qr-code" width="14" />
+          </Button>
+          <Button
             variant="ghost"
             size="sm"
             icon-only
@@ -497,6 +538,13 @@ function add_map_field_value_list(schema_index, field, index) {
             />
           </div>
         </div>
+        <QrScanDialog
+          v-if="form.qr_connect"
+          :open="Boolean(qr_scan_open[index])"
+          :source="form.qr_connect.source || ''"
+          :on_success="(credentials) => apply_qr_result(index, credentials)"
+          @update:open="(v) => (qr_scan_open[index] = v)"
+        />
       </div>
     </div>
     <Button
