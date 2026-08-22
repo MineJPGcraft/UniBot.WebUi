@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button.vue'
 import Select from '@/components/ui/Select.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import Dialog from '@/components/ui/Dialog.vue'
 import MarketPanel from '@/components/MarketPanel.vue'
 import ExtensionConfigDialog from '@/components/ExtensionConfigDialog.vue'
 import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
@@ -40,6 +41,12 @@ const {
   saving_render_config,
   market_items,
   market_loading,
+  studio_status,
+  studio_loading,
+  studio_launching,
+  studio_stopping,
+  studio_log,
+  studio_log_loading,
 } = storeToRefs(extension_store)
 
 const active_tab = ref('installed')
@@ -51,6 +58,8 @@ const market_keyword = ref('')
 const market_filter = ref('')
 /** 市场安装 / 升级操作中的扩展 id */
 const market_action = ref('')
+/** Extension Studio 日志弹窗开关 */
+const studio_log_open = ref(false)
 
 const tabs = [
   { value: 'installed', label: '已安装扩展', icon: 'lucide:puzzle' },
@@ -123,6 +132,7 @@ onMounted(() => {
   extension_store.fetch_renderers().catch(() => {})
   extension_store.fetch_templates().catch(() => {})
   extension_store.fetch_render_configs().catch(() => {})
+  extension_store.fetch_studio_status().catch(() => {})
   search_market()
 })
 
@@ -255,6 +265,63 @@ async function change_template(name) {
     toast.error(error.message || '切换模板失败')
   }
 }
+
+/** 下载（如缺失）并启动 Extension Studio，随后弹出独立窗口打开访问地址（含登录 token） */
+async function launch_studio() {
+  const was_installed = Boolean(studio_status.value?.installed)
+  if (!was_installed) {
+    toast.info('开始下载 Extension Studio…')
+  }
+  try {
+    const url = await extension_store.launch_studio()
+    if (url) {
+      open_studio_window(url)
+      toast.success('Extension Studio 已启动，已弹出窗口')
+    } else {
+      toast.success('Extension Studio 已启动')
+    }
+  } catch (error) {
+    toast.error(error.message || '启动 Extension Studio 失败')
+  }
+}
+
+/** 弹出独立窗口打开 Studio（复用同名窗口，避免重复弹窗） */
+function open_studio_window(url) {
+  const width = Math.min(1280, window.screen.availWidth - 80)
+  const height = Math.min(860, window.screen.availHeight - 80)
+  const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2))
+  const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2))
+  const features = [
+    `width=${width}`,
+    `height=${height}`,
+    `left=${left}`,
+    `top=${top}`,
+    'resizable=yes',
+    'scrollbars=yes',
+    'status=no',
+  ].join(',')
+  window.open(url, 'unibot-studio', features)
+}
+
+/** 停止 Extension Studio */
+async function stop_studio() {
+  try {
+    await extension_store.stop_studio()
+    toast.success('Extension Studio 已停止')
+  } catch (error) {
+    toast.error(error.message || '停止 Extension Studio 失败')
+  }
+}
+
+/** 打开 Extension Studio 日志弹窗 */
+async function open_studio_log() {
+  studio_log_open.value = true
+  try {
+    await extension_store.fetch_studio_log()
+  } catch (error) {
+    toast.error(error.message || '获取 Studio 日志失败')
+  }
+}
 </script>
 
 <template>
@@ -263,6 +330,38 @@ async function change_template(name) {
       <div>
         <h1 class="page-title">扩展管理</h1>
         <p class="page-desc">管理已安装扩展、从市场发现新扩展，或调整渲染引擎与模板</p>
+      </div>
+      <div class="page-actions">
+        <Button
+          v-if="studio_status?.running"
+          variant="ghost"
+          :loading="studio_stopping"
+          :disabled="!auth_store.is_admin"
+          title="停止 Extension Studio"
+          @click="stop_studio"
+        >
+          <Icon icon="lucide:square" width="16" />
+          停止
+        </Button>
+        <Button
+          variant="ghost"
+          :disabled="!studio_status?.installed"
+          title="查看 Extension Studio 日志"
+          @click="open_studio_log"
+        >
+          <Icon icon="lucide:terminal" width="16" />
+          日志
+        </Button>
+        <Button
+          variant="primary"
+          :loading="studio_launching"
+          :disabled="!auth_store.is_admin"
+          title="启动 AI 扩展开发平台"
+          @click="launch_studio"
+        >
+          <Icon icon="lucide:code-2" width="16" />
+          {{ studio_status?.running ? '打开开发扩展' : '开发扩展' }}
+        </Button>
       </div>
     </div>
 
@@ -471,6 +570,22 @@ async function change_template(name) {
       :saving="saving_config"
       @save="save_extension_config"
     />
+
+    <Dialog
+      v-model="studio_log_open"
+      title="Extension Studio 日志"
+      description="Studio 进程输出（stdout / stderr）"
+      :hide-footer="true"
+      width="min(720px, calc(100vw - 32px))"
+    >
+      <div class="studio-log-box">
+        <div v-if="studio_log_loading" class="studio-log-loading">
+          <Spinner :size="16" /> 加载日志中…
+        </div>
+        <pre v-else-if="studio_log" class="studio-log-content">{{ studio_log }}</pre>
+        <div v-else class="studio-log-empty">暂无日志</div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -723,5 +838,36 @@ async function change_template(name) {
 
 .extension-actions .danger:hover {
   background: var(--danger-soft);
+}
+
+/* Extension Studio 日志弹窗 */
+.studio-log-box {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-base);
+}
+
+.studio-log-content {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.studio-log-loading,
+.studio-log-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 </style>

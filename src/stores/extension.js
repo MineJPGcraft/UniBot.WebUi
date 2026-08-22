@@ -35,6 +35,14 @@ export const useExtensionStore = defineStore('extension', () => {
   const image_requirements = ref(null)
   const image_requirements_loading = ref(false)
 
+  // Extension Studio（AI 扩展开发平台）
+  const studio_status = ref(null)
+  const studio_loading = ref(false)
+  const studio_launching = ref(false)
+  const studio_stopping = ref(false)
+  const studio_log = ref('')
+  const studio_log_loading = ref(false)
+
   async function fetch_installed() {
     loading.value = true
     try {
@@ -159,6 +167,52 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
+  /** 获取 Extension Studio 的下载与运行状态 */
+  async function fetch_studio_status() {
+    studio_loading.value = true
+    try {
+      studio_status.value = await http.get('/api/extensions/studio')
+      return studio_status.value
+    } finally {
+      studio_loading.value = false
+    }
+  }
+
+  /** 下载（如缺失）并启动 Extension Studio，返回访问地址（含 token） */
+  async function launch_studio() {
+    studio_launching.value = true
+    try {
+      const data = await http.post('/api/extensions/studio/launch', {})
+      await fetch_studio_status()
+      return data?.url || ''
+    } finally {
+      studio_launching.value = false
+    }
+  }
+
+  /** 停止 Extension Studio */
+  async function stop_studio() {
+    studio_stopping.value = true
+    try {
+      await http.post('/api/extensions/studio/stop', {})
+      await fetch_studio_status()
+    } finally {
+      studio_stopping.value = false
+    }
+  }
+
+  /** 获取 Extension Studio 进程日志 */
+  async function fetch_studio_log(tail = 200) {
+    studio_log_loading.value = true
+    try {
+      const data = await http.get('/api/extensions/studio/log', { query: { tail } })
+      studio_log.value = data?.content || ''
+      return studio_log.value
+    } finally {
+      studio_log_loading.value = false
+    }
+  }
+
   return {
     installed_list,
     loading,
@@ -178,6 +232,12 @@ export const useExtensionStore = defineStore('extension', () => {
     market_loading,
     image_requirements,
     image_requirements_loading,
+    studio_status,
+    studio_loading,
+    studio_launching,
+    studio_stopping,
+    studio_log,
+    studio_log_loading,
     fetch_installed,
     fetch_detail,
     fetch_config,
@@ -193,5 +253,9 @@ export const useExtensionStore = defineStore('extension', () => {
     install_market,
     uninstall_extension,
     fetch_image_requirements,
+    fetch_studio_status,
+    launch_studio,
+    stop_studio,
+    fetch_studio_log,
   }
 })
