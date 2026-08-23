@@ -20,7 +20,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
-  show_actions: { type: Boolean, default: true },
+  showActions: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['save'])
@@ -191,7 +191,7 @@ defineExpose({ confirm_save })
         <div v-else class="config-unsupported">暂不支持该类型</div>
       </div>
     </div>
-    <div v-if="show_actions" class="config-actions">
+    <div v-if="showActions" class="config-actions">
       <Button size="sm" :loading="saving" :disabled="disabled" @click="confirm_save">
         保存配置
       </Button>

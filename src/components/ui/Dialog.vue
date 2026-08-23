@@ -19,11 +19,11 @@ const description_id = useId()
 defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  confirm_text: { type: String, default: '确认' },
-  cancel_text: { type: String, default: '取消' },
-  confirm_variant: { type: String, default: 'primary' },
+  confirmText: { type: String, default: '确认' },
+  cancelText: { type: String, default: '取消' },
+  confirmVariant: { type: String, default: 'primary' },
   loading: { type: Boolean, default: false },
-  hide_footer: { type: Boolean, default: false },
+  hideFooter: { type: Boolean, default: false },
   width: { type: String, default: 'min(480px, calc(100vw - 32px))' },
 })
 
@@ -49,12 +49,12 @@ defineEmits(['confirm'])
         <div class="ui-dialog-body">
           <slot />
         </div>
-        <div v-if="!hide_footer" class="ui-dialog-footer">
+        <div v-if="!hideFooter" class="ui-dialog-footer">
           <DialogClose as-child>
-            <Button variant="ghost">{{ cancel_text }}</Button>
+            <Button variant="ghost">{{ cancelText }}</Button>
           </DialogClose>
-          <Button :variant="confirm_variant" :loading="loading" @click="$emit('confirm')">
-            {{ confirm_text }}
+          <Button :variant="confirmVariant" :loading="loading" @click="$emit('confirm')">
+            {{ confirmText }}
           </Button>
         </div>
       </DialogContent>

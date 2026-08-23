@@ -40,7 +40,7 @@ function on_confirm() {
       :values="values"
       :loading="loading"
       :saving="saving"
-      :show_actions="false"
+      :show-actions="false"
       @save="(payload) => emit('save', payload)"
     />
   </Dialog>

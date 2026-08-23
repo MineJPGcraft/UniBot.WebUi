@@ -1,7 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Button from '@/components/ui/Button.vue'
@@ -10,7 +9,6 @@ import { useStatusStore } from '@/stores/status'
 import { use_toast } from '@/composables/use_toast'
 import { use_async_action } from '@/composables/use_async_action'
 
-const router = useRouter()
 const auth_store = useAuthStore()
 const status_store = useStatusStore()
 const toast = use_toast()
@@ -38,7 +36,11 @@ function toggle_dialog(open) {
 
 function view_details() {
   toggle_dialog(false)
-  router.push({ name: 'SettingsView' })
+  window.open(
+    'https://github.com/MineJPGcraft/UniBot/releases/latest',
+    '_blank',
+    'noopener,noreferrer',
+  )
 }
 
 async function update_bot() {

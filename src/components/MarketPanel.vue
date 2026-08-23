@@ -11,22 +11,22 @@ import Pagination from '@/components/ui/Pagination.vue'
 const props = defineProps({
   items: { type: Array, required: true },
   loading: { type: Boolean, default: false },
-  model_value: { type: String, default: '' },
+  modelValue: { type: String, default: '' },
   placeholder: { type: String, default: '搜索…' },
   /** 工具栏右侧提示文案，为空则不显示 */
   hint: { type: String, default: '' },
-  empty_title: { type: String, default: '未找到相关项目' },
-  empty_description: { type: String, default: '换个关键词试试，或检查网络连接后重新搜索' },
+  emptyTitle: { type: String, default: '未找到相关项目' },
+  emptyDescription: { type: String, default: '换个关键词试试，或检查网络连接后重新搜索' },
   /** 分页配置；total 为 0 时不显示分页 */
   total: { type: Number, default: 0 },
   page: { type: Number, default: 1 },
-  page_size: { type: Number, default: 20 },
+  pageSize: { type: Number, default: 20 },
   /** 卡片图标（Iconify），默认插件图标 */
-  item_icon: { type: String, default: 'lucide:puzzle' },
+  itemIcon: { type: String, default: 'lucide:puzzle' },
   /** 当前操作中的条目 key，用于按钮 loading 与全局禁用 */
   busy: { type: String, default: '' },
   /** 是否显示安装 / 升级操作按钮（权限控制） */
-  show_actions: { type: Boolean, default: true },
+  showActions: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['update:model-value', 'search', 'page-change', 'install', 'upgrade'])
@@ -111,7 +111,7 @@ function upgrade(item) {
   <div class="card market-panel">
     <form class="market-toolbar" @submit.prevent="search">
       <Input
-        :model-value="model_value"
+        :model-value="modelValue"
         class="market-search"
         :placeholder="placeholder"
         @update:model-value="(value) => emit('update:model-value', value)"
@@ -128,13 +128,13 @@ function upgrade(item) {
     <EmptyState
       v-else-if="items.length === 0"
       icon="lucide:store"
-      :title="empty_title"
-      :description="empty_description"
+      :title="emptyTitle"
+      :description="emptyDescription"
     />
     <div v-else class="market-grid">
       <article v-for="item in items" :key="item_key(item)" class="market-card card">
         <div class="market-head">
-          <div class="market-icon"><Icon :icon="item_icon" width="18" /></div>
+          <div class="market-icon"><Icon :icon="itemIcon" width="18" /></div>
           <div class="market-title">
             <h3 class="market-item-title">
               {{ item.name }}
@@ -185,7 +185,7 @@ function upgrade(item) {
             >
               <Icon icon="lucide:github" width="15" />
             </a>
-            <template v-if="show_actions">
+            <template v-if="showActions">
               <Button
                 v-if="can_upgrade(item)"
                 variant="secondary"
@@ -217,8 +217,8 @@ function upgrade(item) {
       </article>
     </div>
 
-    <div v-if="total > page_size" class="market-pagination">
-      <Pagination :page="page" :page-size="page_size" :total="total" @page-change="go_page" />
+    <div v-if="total > pageSize" class="market-pagination">
+      <Pagination :page="page" :page-size="pageSize" :total="total" @page-change="go_page" />
     </div>
   </div>
 </template>
