@@ -62,6 +62,8 @@ const market_filter = ref('')
 const market_action = ref('')
 /** Extension Studio 日志弹窗开关 */
 const studio_log_open = ref(false)
+/** 创意工坊首次下载说明弹窗开关 */
+const studio_intro_open = ref(false)
 
 const tabs = [
   { value: 'installed', label: '已安装扩展', icon: 'lucide:puzzle' },
@@ -266,22 +268,37 @@ async function change_template(name) {
   }
 }
 
-/** 下载（如缺失）并启动 Extension Studio，随后弹出独立窗口打开访问地址（含登录 token） */
+/** 启动创意工坊；首次使用（尚未下载）时先弹窗说明功能，由用户确认后再下载 */
 async function launch_studio() {
-  const was_installed = Boolean(studio_status.value?.installed)
-  if (!was_installed) {
+  if (!studio_status.value?.installed) {
+    studio_intro_open.value = true
+    return
+  }
+  await start_studio(false)
+}
+
+/** 用户在说明弹窗中确认后开始下载并启动 */
+async function confirm_studio_launch() {
+  studio_intro_open.value = false
+  await start_studio(true)
+}
+
+/** 下载（如缺失）并启动 Extension Studio，随后弹出独立窗口打开访问地址（含登录 token） */
+async function start_studio(will_download) {
+  if (will_download) {
     toast.info('开始下载 Extension Studio…')
   }
-  try {
-    const url = await extension_store.launch_studio()
-    if (url) {
-      open_studio_window(url)
-      toast.success('Extension Studio 已启动，已弹出窗口')
-    } else {
-      toast.success('Extension Studio 已启动')
-    }
-  } catch (error) {
-    toast.error(error.message || '启动 Extension Studio 失败')
+  let url = ''
+  const ok = await run(
+    () => extension_store.launch_studio().then((value) => (url = value)),
+    '启动 Extension Studio 失败',
+  )
+  if (!ok) return
+  if (url) {
+    open_studio_window(url)
+    toast.success('Extension Studio 已启动，已弹出窗口')
+  } else {
+    toast.success('Extension Studio 已启动')
   }
 }
 
@@ -360,7 +377,7 @@ async function open_studio_log() {
           @click="launch_studio"
         >
           <Icon icon="lucide:code-2" width="16" />
-          {{ studio_status?.running ? '打开开发扩展' : '开发扩展' }}
+          {{ studio_status?.running ? '打开创意工坊' : '创意工坊' }}
         </Button>
       </div>
     </div>
@@ -570,6 +587,28 @@ async function open_studio_log() {
       :saving="saving_config"
       @save="save_extension_config"
     />
+
+    <Dialog
+      v-model="studio_intro_open"
+      title="创意工坊"
+      description="首次使用需要先下载组件，请先了解该功能"
+      confirm-text="下载并启动"
+      :loading="studio_launching"
+      @confirm="confirm_studio_launch"
+    >
+      <div class="studio-intro">
+        <p>
+          创意工坊（Extension Studio）是内置的 AI
+          开发扩展平台，可以通过对话从零创建、调试并安装你自己的扩展：
+        </p>
+        <ul>
+          <li>根据需求，结合已安装插件/模组，设计一套最适合的方案</li>
+          <li>AI 自主测试并修复，确保装上即可用</li>
+          <li>一键打包并安装到机器人，重启后生效</li>
+        </ul>
+        <p>首次启动需要联网下载组件，可能需要一些时间。是否现在下载？</p>
+      </div>
+    </Dialog>
 
     <Dialog
       v-model="studio_log_open"
@@ -838,6 +877,30 @@ async function open_studio_log() {
 
 .extension-actions .danger:hover {
   background: var(--danger-soft);
+}
+
+/* 创意工坊首次下载说明弹窗 */
+.studio-intro {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.studio-intro p {
+  margin: 0 0 var(--space-2);
+}
+
+.studio-intro p:last-child {
+  margin-bottom: 0;
+}
+
+.studio-intro ul {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
+}
+
+.studio-intro li {
+  margin-bottom: var(--space-1);
 }
 
 /* Extension Studio 日志弹窗 */
