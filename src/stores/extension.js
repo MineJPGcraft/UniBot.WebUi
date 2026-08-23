@@ -146,7 +146,12 @@ export const useExtensionStore = defineStore('extension', () => {
   }
 
   async function install_market(extension_id, version = '') {
-    await http.post('/api/extensions/market/install', { id: extension_id, version })
+    // 下载 + 解压安装耗时较长，放宽超时
+    await http.post(
+      '/api/extensions/market/install',
+      { id: extension_id, version },
+      { timeout_ms: 60000 },
+    )
     await fetch_market()
     await fetch_installed()
   }
@@ -182,7 +187,8 @@ export const useExtensionStore = defineStore('extension', () => {
   async function launch_studio() {
     studio_launching.value = true
     try {
-      const data = await http.post('/api/extensions/studio/launch', {})
+      // 后端等待 Studio 就绪最长约 35s，放宽前端超时
+      const data = await http.post('/api/extensions/studio/launch', {}, { timeout_ms: 90000 })
       await fetch_studio_status()
       return data?.url || ''
     } finally {

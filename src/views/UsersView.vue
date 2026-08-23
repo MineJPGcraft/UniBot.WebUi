@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -19,6 +20,7 @@ import { role_label, format_datetime } from '@/utils/format'
 const user_store = useUserStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { run } = use_async_action()
 const { user_list, total, page, page_size, keyword, loading } = storeToRefs(user_store)
 
 const search_text = ref('')
@@ -53,11 +55,7 @@ onMounted(() => {
 })
 
 async function refresh() {
-  try {
-    await user_store.fetch_users()
-  } catch (error) {
-    toast.error(error.message || '获取用户列表失败')
-  }
+  await run(() => user_store.fetch_users(), '获取用户列表失败')
 }
 
 function handle_search() {
@@ -76,21 +74,21 @@ async function submit_create() {
     toast.error('请填写用户名和密码')
     return
   }
-  submitting.value = true
-  try {
-    await user_store.create_user({
-      username: username.trim(),
-      password,
-      nickname: nickname.trim() || username.trim(),
-      role,
-    })
+  const ok = await run(
+    () =>
+      user_store.create_user({
+        username: username.trim(),
+        password,
+        nickname: nickname.trim() || username.trim(),
+        role,
+      }),
+    '创建失败',
+    submitting,
+  )
+  if (ok) {
     toast.success('用户创建成功')
     create_form.value = { username: '', password: '', nickname: '', role: 'viewer' }
     create_open.value = false
-  } catch (error) {
-    toast.error(error.message || '创建失败')
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -100,18 +98,18 @@ function open_edit(user) {
 }
 
 async function submit_edit() {
-  submitting.value = true
-  try {
-    await user_store.update_user(edit_form.value.user_id, {
-      nickname: edit_form.value.nickname,
-      role: edit_form.value.role,
-    })
+  const ok = await run(
+    () =>
+      user_store.update_user(edit_form.value.user_id, {
+        nickname: edit_form.value.nickname,
+        role: edit_form.value.role,
+      }),
+    '更新失败',
+    submitting,
+  )
+  if (ok) {
     toast.success('用户信息已更新')
     edit_open.value = false
-  } catch (error) {
-    toast.error(error.message || '更新失败')
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -125,15 +123,14 @@ async function submit_reset() {
     toast.error('请输入新密码')
     return
   }
-  submitting.value = true
-  try {
-    await user_store.reset_password(reset_form.value.user_id, reset_form.value.password)
+  const ok = await run(
+    () => user_store.reset_password(reset_form.value.user_id, reset_form.value.password),
+    '重置失败',
+    submitting,
+  )
+  if (ok) {
     toast.success('密码已重置')
     reset_open.value = false
-  } catch (error) {
-    toast.error(error.message || '重置失败')
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -142,15 +139,14 @@ function confirm_delete(user) {
 }
 
 async function submit_delete() {
-  deleting.value = true
-  try {
-    await user_store.delete_user(delete_target.value.user_id)
+  const ok = await run(
+    () => user_store.delete_user(delete_target.value.user_id),
+    '删除失败',
+    deleting,
+  )
+  if (ok) {
     toast.success('用户已删除')
     delete_target.value = null
-  } catch (error) {
-    toast.error(error.message || '删除失败')
-  } finally {
-    deleting.value = false
   }
 }
 

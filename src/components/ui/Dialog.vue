@@ -1,4 +1,5 @@
 <script setup>
+import { useId } from 'vue'
 import {
   DialogRoot,
   DialogTrigger,
@@ -13,14 +14,16 @@ import Button from './Button.vue'
 
 const open = defineModel({ type: Boolean, default: false })
 
+const description_id = useId()
+
 defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  confirmText: { type: String, default: '确认' },
-  cancelText: { type: String, default: '取消' },
-  confirmVariant: { type: String, default: 'primary' },
+  confirm_text: { type: String, default: '确认' },
+  cancel_text: { type: String, default: '取消' },
+  confirm_variant: { type: String, default: 'primary' },
   loading: { type: Boolean, default: false },
-  hideFooter: { type: Boolean, default: false },
+  hide_footer: { type: Boolean, default: false },
   width: { type: String, default: 'min(480px, calc(100vw - 32px))' },
 })
 
@@ -37,21 +40,21 @@ defineEmits(['confirm'])
       <DialogContent
         class="ui-dialog-content"
         :style="{ width }"
-        :aria-describedby="description ? 'dialog-description' : undefined"
+        :aria-describedby="description ? description_id : undefined"
       >
         <DialogTitle class="ui-dialog-title">{{ title }}</DialogTitle>
-        <DialogDescription v-if="description" id="dialog-description" class="ui-dialog-description">
+        <DialogDescription v-if="description" :id="description_id" class="ui-dialog-description">
           {{ description }}
         </DialogDescription>
         <div class="ui-dialog-body">
           <slot />
         </div>
-        <div v-if="!hideFooter" class="ui-dialog-footer">
+        <div v-if="!hide_footer" class="ui-dialog-footer">
           <DialogClose as-child>
-            <Button variant="ghost">{{ cancelText }}</Button>
+            <Button variant="ghost">{{ cancel_text }}</Button>
           </DialogClose>
-          <Button :variant="confirmVariant" :loading="loading" @click="$emit('confirm')">
-            {{ confirmText }}
+          <Button :variant="confirm_variant" :loading="loading" @click="$emit('confirm')">
+            {{ confirm_text }}
           </Button>
         </div>
       </DialogContent>

@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useStatusStore } from '@/stores/status'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -13,10 +14,19 @@ import { role_label, format_datetime, format_uptime } from '@/utils/format'
 const auth_store = useAuthStore()
 const status_store = useStatusStore()
 const toast = use_toast()
+const { run } = use_async_action()
 const { user } = storeToRefs(auth_store)
 const { status } = storeToRefs(status_store)
 
-const nickname = ref(user.value?.nickname || '')
+const nickname = ref('')
+// fetch_me 是异步的：用户信息就绪后同步昵称，避免首次直达本页时表单为空
+watch(
+  user,
+  (current) => {
+    if (current?.nickname) nickname.value = current.nickname
+  },
+  { immediate: true },
+)
 const saving_profile = ref(false)
 
 const password_form = ref({ old_password: '', new_password: '', confirm_password: '' })
@@ -38,30 +48,19 @@ const update_hint = computed(() => {
 })
 
 async function check_update() {
-  checking_update.value = true
-  try {
-    await status_store.check_update()
-    if (status.value?.has_update) {
-      toast.info(`发现新版本 ${status.value.latest_version}，请及时更新`)
-    } else {
-      toast.success('当前已是最新版本')
-    }
-  } catch (error) {
-    toast.error(error.message || '检测失败')
-  } finally {
-    checking_update.value = false
+  const ok = await run(() => status_store.check_update(), '检测失败', checking_update)
+  if (!ok) return
+  if (status.value?.has_update) {
+    toast.info(`发现新版本 ${status.value.latest_version}，请及时更新`)
+  } else {
+    toast.success('当前已是最新版本')
   }
 }
 
 async function update_bot() {
-  updating.value = true
-  try {
-    await status_store.update_bot()
+  const ok = await run(() => status_store.update_bot(), '更新失败', updating)
+  if (ok) {
     toast.success('更新成功，机器人正在重启')
-  } catch (error) {
-    toast.error(error.message || '更新失败')
-  } finally {
-    updating.value = false
   }
 }
 
@@ -91,14 +90,13 @@ async function save_profile() {
     toast.error('昵称不能为空')
     return
   }
-  saving_profile.value = true
-  try {
-    await auth_store.update_profile(nickname.value.trim())
+  const ok = await run(
+    () => auth_store.update_profile(nickname.value.trim()),
+    '更新失败',
+    saving_profile,
+  )
+  if (ok) {
     toast.success('昵称已更新')
-  } catch (error) {
-    toast.error(error.message || '更新失败')
-  } finally {
-    saving_profile.value = false
   }
 }
 
@@ -116,15 +114,14 @@ async function save_password() {
     toast.error('两次输入的新密码不一致')
     return
   }
-  saving_password.value = true
-  try {
-    await auth_store.change_password(old_password, new_password)
+  const ok = await run(
+    () => auth_store.change_password(old_password, new_password),
+    '修改失败',
+    saving_password,
+  )
+  if (ok) {
     toast.success('密码已修改')
     password_form.value = { old_password: '', new_password: '', confirm_password: '' }
-  } catch (error) {
-    toast.error(error.message || '修改失败')
-  } finally {
-    saving_password.value = false
   }
 }
 </script>
@@ -541,16 +538,6 @@ async function save_password() {
 .update-button:hover:not(:disabled) {
   background: var(--accent-strong);
   color: #ffffff;
-}
-
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .about-update-bar {

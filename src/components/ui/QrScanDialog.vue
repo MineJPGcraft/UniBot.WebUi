@@ -9,13 +9,11 @@ import { use_qq_qr_connect, QR_LOGIN_STATE } from '@/composables/use_qq_qr_conne
 const props = defineProps({
   /** 弹窗开关 */
   open: { type: Boolean, default: false },
-  /** 扫码成功后的回调：接收 { app_id, app_secret, user_openid } */
-  on_success: { type: Function, default: null },
   /** 接入平台标识 */
   source: { type: String, default: '' },
 })
 
-const emit = defineEmits(['update:open'])
+const emit = defineEmits(['update:open', 'success'])
 
 const { creating, polling, login, start_login, poll_login, cancel_login } = use_qq_qr_connect()
 
@@ -57,13 +55,11 @@ async function poll_until_done() {
   try {
     const result = await poll_login()
     if (result.state === QR_LOGIN_STATE.COMPLETED) {
-      if (props.on_success) {
-        props.on_success({
-          app_id: result.app_id,
-          app_secret: result.app_secret,
-          user_openid: result.user_openid,
-        })
-      }
+      emit('success', {
+        app_id: result.app_id,
+        app_secret: result.app_secret,
+        user_openid: result.user_openid,
+      })
       emit('update:open', false)
     } else if (result.state === QR_LOGIN_STATE.FAILED) {
       error_message.value = result.error || '扫码失败'

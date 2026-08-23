@@ -46,7 +46,9 @@ const type_labels = { builtin: '内置插件', dependency: '依赖插件', exter
 
 onMounted(() => {
   refresh_installed()
-  plugin_store.fetch_registered_plugins().catch(() => {})
+  plugin_store
+    .fetch_registered_plugins()
+    .catch((error) => console.warn('fetch_registered_plugins failed', error))
   search_market()
 })
 

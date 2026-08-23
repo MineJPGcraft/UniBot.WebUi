@@ -5,13 +5,14 @@ import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useServerStore } from '@/stores/server'
 import { useAuthStore } from '@/stores/auth'
-import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import { use_websocket } from '@/composables/use_websocket'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Progress from '@/components/ui/Progress.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import PlayerHead from '@/components/PlayerHead.vue'
 import { server_type_icon, server_type_label } from '@/utils/server'
 import { format_mb } from '@/utils/format'
 
@@ -19,7 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const server_store = useServerStore()
 const auth_store = useAuthStore()
-const toast = use_toast()
+const { run } = use_async_action()
 const { on_event } = use_websocket()
 
 const server_name = computed(() => route.params.name)
@@ -74,18 +75,15 @@ onUnmounted(() => {
 
 async function refresh() {
   loading.value = true
-  try {
+  await run(async () => {
     const [detail_data, players_data] = await Promise.all([
       server_store.fetch_server_detail(server_name.value),
       server_store.fetch_server_players(server_name.value),
     ])
     detail.value = detail_data
     player_list.value = players_data.players || []
-  } catch (error) {
-    toast.error(error.message || '获取服务器信息失败')
-  } finally {
-    loading.value = false
-  }
+  }, '获取服务器信息失败')
+  loading.value = false
 }
 
 async function run_command() {
@@ -210,16 +208,7 @@ function handle_command_keydown(event) {
             <EmptyState v-if="player_list.length === 0" icon="lucide:user-x" title="暂无在线玩家" />
             <ul v-else class="player-list">
               <li v-for="player in player_list" :key="player" class="player-item">
-                <span class="player-head-wrap">
-                  <img
-                    class="player-head"
-                    :src="`/webui/api/players/${encodeURIComponent(player)}/avatar`"
-                    alt=""
-                    loading="lazy"
-                    @error="(e) => (e.target.style.display = 'none')"
-                  />
-                  <span class="player-head-fallback">{{ player.slice(0, 1).toUpperCase() }}</span>
-                </span>
+                <PlayerHead :name="player" :size="24" />
                 <span class="player-name mono">{{ player }}</span>
               </li>
             </ul>
@@ -375,36 +364,6 @@ function handle_command_keydown(event) {
 
 .player-item:hover {
   background: var(--surface-sunken);
-}
-
-.player-head-wrap {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-.player-head {
-  position: relative;
-  z-index: 1;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  image-rendering: pixelated;
-  background: var(--surface-sunken);
-}
-
-.player-head-fallback {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--surface-sunken);
-  border-radius: 4px;
 }
 
 .player-name {

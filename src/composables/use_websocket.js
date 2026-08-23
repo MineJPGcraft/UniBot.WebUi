@@ -5,7 +5,7 @@
  * - 支持按事件类型订阅/取消订阅，事件通过回调分发
  */
 import { ref } from 'vue'
-import { is_authenticated } from '@/utils/http'
+import { API_BASE, is_authenticated } from '@/utils/http'
 
 const connection_state = ref('disconnected') // disconnected | connecting | connected
 const event_listeners = new Map() // event_type -> Set<callback>
@@ -23,7 +23,7 @@ function build_url() {
   const is_dev = import.meta.env.DEV
   const host = is_dev ? `${window.location.hostname}:8000` : window.location.host
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${host}/webui/ws`
+  return `${protocol}://${host}${API_BASE}/ws`
 }
 
 function send(message) {

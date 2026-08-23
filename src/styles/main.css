@@ -69,6 +69,7 @@
   --z-dialog: 201;
   --z-dropdown: 300;
   --z-tooltip: 400;
+  --z-toast: 500;
 
   /* 动效 */
   --transition: 150ms ease-out;
@@ -184,6 +185,18 @@ ol {
 
 .text-sm {
   font-size: var(--text-sm);
+}
+
+/* ---------- 动画工具类 ---------- */
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 页面容器 */

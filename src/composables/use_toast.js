@@ -5,17 +5,26 @@
 import { ref } from 'vue'
 
 const toast_list = ref([])
+const toast_timers = new Map()
 let toast_id = 0
 
 function push_toast(type, message, duration = 3000) {
   const id = ++toast_id
   toast_list.value.push({ id, type, message })
   if (duration > 0) {
-    setTimeout(() => dismiss_toast(id), duration)
+    toast_timers.set(
+      id,
+      setTimeout(() => dismiss_toast(id), duration),
+    )
   }
 }
 
 function dismiss_toast(id) {
+  const timer_id = toast_timers.get(id)
+  if (timer_id !== undefined) {
+    clearTimeout(timer_id)
+    toast_timers.delete(id)
+  }
   toast_list.value = toast_list.value.filter((toast) => toast.id !== id)
 }
 

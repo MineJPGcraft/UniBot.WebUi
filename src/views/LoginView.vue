@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -11,6 +12,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 const router = useRouter()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { run } = use_async_action()
 
 // null 探测中 | 'login' | 'setup'
 const mode = ref(null)
@@ -45,15 +47,14 @@ async function handle_login() {
     toast.error('请输入用户名和密码')
     return
   }
-  submitting.value = true
-  try {
-    await auth_store.login(login_form.value.username, login_form.value.password)
+  const ok = await run(
+    () => auth_store.login(login_form.value.username, login_form.value.password),
+    '登录失败',
+    submitting,
+  )
+  if (ok) {
     toast.success('登录成功')
     router.push('/')
-  } catch (error) {
-    toast.error(error.message || '登录失败')
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -71,17 +72,15 @@ async function handle_setup() {
     toast.error('两次输入的密码不一致')
     return
   }
-  submitting.value = true
-  try {
-    await auth_store.setup(username, password, nickname || '管理员')
+  const ok = await run(
+    () => auth_store.setup(username, password, nickname || '管理员'),
+    '初始化失败',
+    submitting,
+  )
+  // 无论成败都回到登录表单：失败时后端可能检测到已有账户（如并发创建）
+  mode.value = 'login'
+  if (ok) {
     toast.success('初始化成功，请登录')
-    mode.value = 'login'
-  } catch (error) {
-    // 后端检测到已有账户（如并发创建），回到登录表单
-    toast.error(error.message || '初始化失败')
-    mode.value = 'login'
-  } finally {
-    submitting.value = false
   }
 }
 </script>

@@ -5,16 +5,19 @@ import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import PlayerHead from '@/components/PlayerHead.vue'
 
 const player_store = usePlayerStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { run } = use_async_action()
 const { binding_list, total, page, page_size, keyword, loading } = storeToRefs(player_store)
 
 const search_text = ref('')
@@ -33,11 +36,7 @@ onMounted(() => {
 })
 
 async function refresh() {
-  try {
-    await player_store.fetch_bindings()
-  } catch (error) {
-    toast.error(error.message || '获取绑定列表失败')
-  }
+  await run(() => player_store.fetch_bindings(), '获取绑定列表失败')
 }
 
 function handle_search() {
@@ -56,16 +55,15 @@ async function submit_bind() {
     toast.error('请填写 QQ 号和游戏 ID')
     return
   }
-  binding.value = true
-  try {
-    await player_store.bind_player(user.trim(), player.trim())
+  const ok = await run(
+    () => player_store.bind_player(user.trim(), player.trim()),
+    '绑定失败',
+    binding,
+  )
+  if (ok) {
     toast.success('绑定成功')
     bind_form.value = { user: '', player: '' }
     bind_open.value = false
-  } catch (error) {
-    toast.error(error.message || '绑定失败')
-  } finally {
-    binding.value = false
   }
 }
 
@@ -75,15 +73,14 @@ function confirm_unbind(user, player) {
 
 async function submit_unbind() {
   if (!unbind_target.value) return
-  unbinding.value = true
-  try {
-    await player_store.unbind_player(unbind_target.value.user, unbind_target.value.player)
+  const ok = await run(
+    () => player_store.unbind_player(unbind_target.value.user, unbind_target.value.player),
+    '解绑失败',
+    unbinding,
+  )
+  if (ok) {
     toast.success('已解除绑定')
     unbind_target.value = null
-  } catch (error) {
-    toast.error(error.message || '解绑失败')
-  } finally {
-    unbinding.value = false
   }
 }
 </script>
@@ -146,16 +143,7 @@ async function submit_unbind() {
             <td>
               <div class="player-tags">
                 <span v-for="player in binding.players" :key="player" class="player-tag">
-                  <span class="player-head-wrap">
-                    <img
-                      class="player-head"
-                      :src="`/webui/api/players/${encodeURIComponent(player)}/avatar`"
-                      alt=""
-                      loading="lazy"
-                      @error="(e) => (e.target.style.display = 'none')"
-                    />
-                    <span class="player-head-fallback">{{ player.slice(0, 1).toUpperCase() }}</span>
-                  </span>
+                  <PlayerHead :name="player" :size="16" />
                   {{ player }}
                   <button
                     v-if="auth_store.is_operator"
@@ -274,36 +262,6 @@ async function submit_unbind() {
   border-radius: 4px;
   font-size: var(--text-xs);
   font-family: var(--font-mono);
-}
-
-.player-head-wrap {
-  position: relative;
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.player-head {
-  position: relative;
-  z-index: 1;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  image-rendering: pixelated;
-  background: var(--surface-sunken);
-}
-
-.player-head-fallback {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--surface-sunken);
-  border-radius: 3px;
 }
 
 .tag-remove {

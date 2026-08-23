@@ -100,6 +100,8 @@ export const useLogStore = defineStore('log', () => {
   // 每收到一条新日志自增，供页面 watch 触发自动滚动
   // （watch 数组 ref 的 push 不会触发，必须依赖该计数器）
   const live_version = ref(0)
+  // 订阅句柄仅保存以防丢失：实时日志订阅是应用生命周期级的单例，
+  // 缓存跨页面保留，登出时由 clear_live() 清空数据、连接由 use_websocket 统一管理
   let live_subscription = null
   let live_history_subscription = null
   let live_initialized = false

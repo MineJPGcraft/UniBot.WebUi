@@ -128,15 +128,9 @@ export const useConfigStore = defineStore('config', () => {
     if (!has_changes.value) return
     saving.value = true
     try {
-      const patch = {}
+      let patch = {}
       for (const change of changes.value) {
-        const keys = change.key.split('.')
-        let current = patch
-        for (let index = 0; index < keys.length - 1; index += 1) {
-          current[keys[index]] = current[keys[index]] || {}
-          current = current[keys[index]]
-        }
-        current[keys[keys.length - 1]] = change.new_value
+        patch = set_nested(patch, change.key, change.new_value)
       }
       await http.patch('/api/config', patch)
       await fetch_all()

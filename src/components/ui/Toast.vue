@@ -33,7 +33,7 @@ const icon_map = {
   position: fixed;
   top: var(--space-4);
   right: var(--space-4);
-  z-index: 400;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

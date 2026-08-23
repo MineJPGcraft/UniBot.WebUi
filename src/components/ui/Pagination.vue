@@ -16,13 +16,13 @@ import Input from './Input.vue'
 
 const props = defineProps({
   page: { type: Number, required: true },
-  pageSize: { type: Number, required: true },
+  page_size: { type: Number, required: true },
   total: { type: Number, required: true },
 })
 
 const emit = defineEmits(['page-change'])
 
-const total_pages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
+const total_pages = computed(() => Math.max(1, Math.ceil(props.total / props.page_size)))
 
 const jump_value = ref('')
 
@@ -43,7 +43,7 @@ function jump() {
     <PaginationRoot
       :page="page"
       :total="total"
-      :items-per-page="pageSize"
+      :items-per-page="page_size"
       show-edges
       @update:page="on_page_change"
     >

@@ -45,7 +45,6 @@ const qr_scan_open = reactive({})
 
 /** 扫码成功后回填的字段（由 form.qr_connect 指定） */
 function apply_qr_result(index, credentials) {
-  console.log(1234)
   const qr_config = props.form.qr_connect
   if (!qr_config) return
   const items = clone(array_items())
@@ -269,71 +268,73 @@ function map_value_default(field) {
 
 // ===== map 列表值（value_type: list）=====
 
-function map_list_items(value) {
-  return Array.isArray(value) ? value : []
+function to_list(list_value) {
+  return Array.isArray(list_value) ? list_value : []
+}
+
+/** 顶层 map 中第 index 个键的列表值读写上下文 */
+function top_list_context(index) {
+  const entries = clone(map_entries())
+  const [key] = entries[index]
+  return {
+    list: clone(to_list(entries[index][1])),
+    commit(list) {
+      entries[index] = [key, list]
+      update(Object.fromEntries(entries))
+    },
+  }
+}
+
+/** array 内字段对象中第 index 个键的列表值读写上下文 */
+function field_list_context(schema_index, field, index) {
+  const items = clone(array_items())
+  const obj = clone(items[schema_index][field.key] || {})
+  const entries = Object.entries(obj)
+  const [key] = entries[index]
+  return {
+    list: clone(to_list(entries[index][1])),
+    commit(list) {
+      entries[index] = [key, list]
+      items[schema_index][field.key] = Object.fromEntries(entries)
+      update(items)
+    },
+  }
 }
 
 function update_map_value_list(index, list_index, new_value) {
-  const entries = clone(map_entries())
-  const [key] = entries[index]
-  const list = clone(map_list_items(entries[index][1]))
-  list[list_index] = new_value
-  entries[index] = [key, list]
-  update(Object.fromEntries(entries))
+  const context = top_list_context(index)
+  context.list[list_index] = new_value
+  context.commit(context.list)
 }
 
 function remove_map_value_list_item(index, list_index) {
-  const entries = clone(map_entries())
-  const [key] = entries[index]
-  const list = clone(map_list_items(entries[index][1]))
-  list.splice(list_index, 1)
-  entries[index] = [key, list]
-  update(Object.fromEntries(entries))
+  const context = top_list_context(index)
+  context.list.splice(list_index, 1)
+  context.commit(context.list)
 }
 
 function add_map_value_list_item(index) {
-  const entries = clone(map_entries())
-  const [key] = entries[index]
-  const list = clone(map_list_items(entries[index][1]))
-  list.push('')
-  entries[index] = [key, list]
-  update(Object.fromEntries(entries))
+  const context = top_list_context(index)
+  context.list.push('')
+  context.commit(context.list)
 }
 
 function update_map_field_value_list(schema_index, field, index, list_index, new_value) {
-  const items = clone(array_items())
-  const obj = clone(items[schema_index][field.key] || {})
-  const entries = Object.entries(obj)
-  const [key] = entries[index]
-  const list = clone(map_list_items(entries[index][1]))
-  list[list_index] = new_value
-  entries[index] = [key, list]
-  items[schema_index][field.key] = Object.fromEntries(entries)
-  update(items)
+  const context = field_list_context(schema_index, field, index)
+  context.list[list_index] = new_value
+  context.commit(context.list)
 }
 
 function remove_map_field_value_list(schema_index, field, index, list_index) {
-  const items = clone(array_items())
-  const obj = clone(items[schema_index][field.key] || {})
-  const entries = Object.entries(obj)
-  const [key] = entries[index]
-  const list = clone(map_list_items(entries[index][1]))
-  list.splice(list_index, 1)
-  entries[index] = [key, list]
-  items[schema_index][field.key] = Object.fromEntries(entries)
-  update(items)
+  const context = field_list_context(schema_index, field, index)
+  context.list.splice(list_index, 1)
+  context.commit(context.list)
 }
 
 function add_map_field_value_list(schema_index, field, index) {
-  const items = clone(array_items())
-  const obj = clone(items[schema_index][field.key] || {})
-  const entries = Object.entries(obj)
-  const [key] = entries[index]
-  const list = clone(map_list_items(entries[index][1]))
-  list.push('')
-  entries[index] = [key, list]
-  items[schema_index][field.key] = Object.fromEntries(entries)
-  update(items)
+  const context = field_list_context(schema_index, field, index)
+  context.list.push('')
+  context.commit(context.list)
 }
 </script>
 
@@ -479,7 +480,7 @@ function add_map_field_value_list(schema_index, field, index) {
                 <span class="jfe-map__arrow">→</span>
                 <div v-if="field.value_type === 'list'" class="jfe-map__list">
                   <div
-                    v-for="(list_item, lindex) in map_list_items(entry[1])"
+                    v-for="(list_item, lindex) in to_list(entry[1])"
                     :key="lindex"
                     class="jfe-map__list-row"
                   >
@@ -542,7 +543,7 @@ function add_map_field_value_list(schema_index, field, index) {
           v-if="form.qr_connect"
           :open="Boolean(qr_scan_open[index])"
           :source="form.qr_connect.source || ''"
-          :on_success="(credentials) => apply_qr_result(index, credentials)"
+          @success="(credentials) => apply_qr_result(index, credentials)"
           @update:open="(v) => (qr_scan_open[index] = v)"
         />
       </div>
@@ -571,7 +572,7 @@ function add_map_field_value_list(schema_index, field, index) {
       <span class="jfe-map__arrow">→</span>
       <div v-if="form.value_type === 'list'" class="jfe-map__list">
         <div
-          v-for="(list_item, lindex) in map_list_items(entry[1])"
+          v-for="(list_item, lindex) in to_list(entry[1])"
           :key="lindex"
           class="jfe-map__list-row"
         >

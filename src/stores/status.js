@@ -22,14 +22,16 @@ export const useStatusStore = defineStore('status', () => {
   }
 
   async function check_update() {
-    const data = await http.post('/api/status/check-update', {})
+    // 后端访问 GitHub API，放宽超时
+    const data = await http.post('/api/status/check-update', {}, { timeout_ms: 30000 })
     status.value = { ...status.value, ...data }
     return data
   }
 
   /** 从 GitHub Release 更新机器人（成功后后端会触发重启） */
   async function update_bot() {
-    const data = await http.post('/api/status/update', {})
+    // 下载完整发布包耗时较长，大幅放宽超时
+    const data = await http.post('/api/status/update', {}, { timeout_ms: 120000 })
     return data
   }
 

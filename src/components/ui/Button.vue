@@ -6,7 +6,7 @@ defineProps({
   size: { type: String, default: 'md' }, // md | sm
   loading: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
-  iconOnly: { type: Boolean, default: false },
+  icon_only: { type: Boolean, default: false },
 })
 </script>
 
@@ -15,7 +15,7 @@ defineProps({
     class="ui-button"
     :class="[
       `ui-button--${variant}`,
-      { 'ui-button--sm': size === 'sm', 'ui-button--icon': iconOnly },
+      { 'ui-button--sm': size === 'sm', 'ui-button--icon': icon_only },
     ]"
     :disabled="disabled || loading"
   >

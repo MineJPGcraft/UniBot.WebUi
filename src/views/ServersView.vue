@@ -6,6 +6,7 @@ import { storeToRefs } from 'pinia'
 import { useServerStore } from '@/stores/server'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -18,6 +19,7 @@ const router = useRouter()
 const server_store = useServerStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { run } = use_async_action()
 const { server_list, loading } = storeToRefs(server_store)
 
 const online_count = computed(() => server_list.value.filter((server) => server.online).length)
@@ -31,11 +33,7 @@ onMounted(() => {
 })
 
 async function refresh() {
-  try {
-    await server_store.fetch_server_list()
-  } catch (error) {
-    toast.error(error.message || '获取服务器列表失败')
-  }
+  await run(() => server_store.fetch_server_list(), '获取服务器列表失败')
 }
 
 async function submit_broadcast() {
@@ -43,16 +41,15 @@ async function submit_broadcast() {
     toast.error('请输入广播消息')
     return
   }
-  broadcasting.value = true
-  try {
-    await server_store.broadcast_message(broadcast_message.value.trim())
+  const ok = await run(
+    () => server_store.broadcast_message(broadcast_message.value.trim()),
+    '广播失败',
+    broadcasting,
+  )
+  if (ok) {
     toast.success('广播已发送')
     broadcast_message.value = ''
     broadcast_open.value = false
-  } catch (error) {
-    toast.error(error.message || '广播失败')
-  } finally {
-    broadcasting.value = false
   }
 }
 </script>

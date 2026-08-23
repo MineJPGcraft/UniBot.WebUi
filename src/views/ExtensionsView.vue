@@ -6,6 +6,7 @@ import { useExtensionStore } from '@/stores/extension'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import { use_restart } from '@/composables/use_restart'
 import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -23,6 +24,7 @@ const extension_store = useExtensionStore()
 const auth_store = useAuthStore()
 const config_store = useConfigStore()
 const toast = use_toast()
+const { run } = use_async_action()
 const { ask_restart } = use_restart()
 const {
   installed_list,
@@ -126,31 +128,29 @@ const state_variants = {
 /** 图片模式是否开启；关闭时「渲染设置」整体锁定 */
 const image_mode_enabled = computed(() => Boolean(config_store.config_data?.image?.mode))
 
-onMounted(() => {
-  if (!config_store.config_data) config_store.fetch_all().catch(() => {})
+onMounted(async () => {
+  const load_tasks = [
+    config_store.config_data ? Promise.resolve() : config_store.fetch_all(),
+    extension_store.fetch_renderers(),
+    extension_store.fetch_templates(),
+    extension_store.fetch_render_configs(),
+    extension_store.fetch_studio_status(),
+  ]
   refresh_installed()
-  extension_store.fetch_renderers().catch(() => {})
-  extension_store.fetch_templates().catch(() => {})
-  extension_store.fetch_render_configs().catch(() => {})
-  extension_store.fetch_studio_status().catch(() => {})
   search_market()
+  const results = await Promise.allSettled(load_tasks)
+  if (results.some((result) => result.status === 'rejected')) {
+    toast.error('部分扩展信息加载失败')
+  }
 })
 
 async function refresh_installed() {
-  try {
-    await extension_store.fetch_installed()
-  } catch (error) {
-    toast.error(error.message || '获取扩展列表失败')
-  }
+  await run(() => extension_store.fetch_installed(), '获取扩展列表失败')
 }
 
 async function search_market() {
   market_filter.value = market_keyword.value
-  try {
-    await extension_store.fetch_market()
-  } catch (error) {
-    toast.error(error.message || '获取扩展市场失败')
-  }
+  await run(() => extension_store.fetch_market(), '获取扩展市场失败')
 }
 
 /** 扩展市场本地搜索过滤（后端接口无搜索参数） */

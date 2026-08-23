@@ -27,26 +27,44 @@ const emit = defineEmits(['save'])
 
 const draft = reactive({})
 
-// schema/values 就绪后按当前值初始化草稿（数据更新时重建，避免先展示再异步拉取导致空表单）
+// 仅在 schema 变化时重建草稿：values 引用会因父组件刷新而变化，
+// 若跟随重建会把用户未保存的编辑覆盖掉（H7 草稿保护）
 watch(
-  () => [props.schema, props.values],
+  () => props.schema,
   () => {
     if (!props.schema) return
     Object.keys(draft).forEach((key) => delete draft[key])
-    const properties = props.schema?.properties || {}
-    for (const key of Object.keys(properties)) {
-      const property = properties[key]
-      const current = props.values[key] ?? property.default ?? ''
-      draft[key] =
-        field_type(property) === 'array'
-          ? Array.isArray(current)
-            ? current.join(', ')
-            : ''
-          : current
-    }
+    rebuild_draft()
   },
   { immediate: true },
 )
+
+// values 首次就绪（从空到有）时填充草稿；已有编辑时不覆盖
+watch(
+  () => props.values,
+  (values, previous) => {
+    if (!props.schema) return
+    const has_previous = previous && Object.keys(previous).length > 0
+    if (has_previous && Object.keys(draft).length > 0) return
+    rebuild_draft()
+  },
+)
+
+/** 以当前 schema + values 重建草稿 */
+function rebuild_draft() {
+  Object.keys(draft).forEach((key) => delete draft[key])
+  const properties = props.schema?.properties || {}
+  for (const key of Object.keys(properties)) {
+    const property = properties[key]
+    const current = props.values[key] ?? property.default ?? ''
+    draft[key] =
+      field_type(property) === 'array'
+        ? Array.isArray(current)
+          ? current.join(', ')
+          : ''
+        : current
+  }
+}
 
 function field_type(property) {
   if (property.type === 'boolean') return 'boolean'

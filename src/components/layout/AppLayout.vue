@@ -16,8 +16,8 @@ const { status } = storeToRefs(status_store)
 const { connect, disconnect } = use_websocket()
 
 onMounted(() => {
-  auth_store.fetch_me().catch(() => {})
-  status_store.fetch_status().catch(() => {})
+  auth_store.fetch_me().catch((error) => console.warn('fetch_me failed', error))
+  status_store.fetch_status().catch((error) => console.warn('fetch_status failed', error))
   status_store.init()
   connect()
 })

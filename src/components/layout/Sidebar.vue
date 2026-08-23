@@ -148,16 +148,6 @@ const nav_items = [
   opacity: 0.65;
 }
 
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .sidebar-nav {
   flex: 1;
   display: flex;

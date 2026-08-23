@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useLogStore } from '@/stores/log'
-import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -15,7 +15,7 @@ import { format_bytes, format_datetime, level_class } from '@/utils/format'
 import { ansi_to_html } from '@/utils/ansi'
 
 const log_store = useLogStore()
-const toast = use_toast()
+const { run } = use_async_action()
 const {
   file_list,
   current_file,
@@ -73,52 +73,33 @@ onMounted(async () => {
   // 实时日志由共享 store 缓存，跨页面保留；此处只需确保订阅已启动
   log_store.init_live()
 
-  try {
+  await run(async () => {
     await log_store.fetch_file_list()
     if (file_list.value.length > 0) {
       log_store.select_file(file_list.value[0].name)
       await log_store.fetch_content()
     }
-  } catch (error) {
-    toast.error(error.message || '获取日志失败')
-  }
+  }, '获取日志失败')
 })
 
 async function select_file(name) {
   log_store.select_file(name)
   keyword_input.value = ''
-  try {
-    await log_store.fetch_content()
-  } catch (error) {
-    toast.error(error.message || '读取日志失败')
-  }
+  await run(() => log_store.fetch_content(), '读取日志失败')
 }
 
-async function apply_keyword() {
+// 过滤与分页均为客户端计算（store 的 filtered_lines/log_items），
+// 变更后无需重新请求文件内容
+function apply_keyword() {
   log_store.set_keyword_filter(keyword_input.value.trim())
-  try {
-    await log_store.fetch_content()
-  } catch (error) {
-    toast.error(error.message || '过滤失败')
-  }
 }
 
-async function change_level(level) {
+function change_level(level) {
   log_store.set_level_filter(level)
-  try {
-    await log_store.fetch_content()
-  } catch (error) {
-    toast.error(error.message || '过滤失败')
-  }
 }
 
-async function handle_page_change(target_page) {
+function handle_page_change(target_page) {
   log_store.set_page(target_page)
-  try {
-    await log_store.fetch_content()
-  } catch (error) {
-    toast.error(error.message || '加载失败')
-  }
 }
 </script>
 

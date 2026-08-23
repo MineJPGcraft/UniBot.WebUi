@@ -12,13 +12,29 @@ const prompt_title = ref('')
 const prompt_message = ref('')
 const restarting = ref(false)
 
+// 等待重启的取消标志：用户关闭弹窗 / 登出时置位，终止健康检查循环
+let waiting_cancelled = false
+
+function cancel_wait() {
+  waiting_cancelled = true
+}
+
 async function wait_for_restart(previous_started_at) {
   const toast = use_toast()
   for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (waiting_cancelled) {
+      restarting.value = false
+      return
+    }
     await new Promise((resolve) => window.setTimeout(resolve, 500))
+    if (waiting_cancelled) {
+      restarting.value = false
+      return
+    }
     try {
       const health = await http.get('/api/status/health', { auth: false })
       if (health.started_at !== previous_started_at) {
+        restarting.value = false
         window.location.reload()
         return
       }
@@ -33,6 +49,7 @@ async function wait_for_restart(previous_started_at) {
 async function restart_bot() {
   const toast = use_toast()
   restarting.value = true
+  waiting_cancelled = false
   try {
     const previous_instance = await http.post('/api/status/restart', {})
     prompt_open.value = false
@@ -58,6 +75,8 @@ export function use_restart() {
 
   function close_prompt() {
     prompt_open.value = false
+    // 关闭询问框即放弃本次等待，避免后台继续轮询并在完成后强制刷新页面
+    if (restarting.value) cancel_wait()
   }
 
   return {

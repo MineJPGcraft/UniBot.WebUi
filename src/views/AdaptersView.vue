@@ -6,6 +6,7 @@ import { storeToRefs } from 'pinia'
 import { useAdapterStore } from '@/stores/adapter'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
+import { use_async_action } from '@/composables/use_async_action'
 import { use_restart } from '@/composables/use_restart'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -16,6 +17,7 @@ import Switch from '@/components/ui/Switch.vue'
 const adapter_store = useAdapterStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
+const { run } = use_async_action()
 const { ask_restart } = use_restart()
 const router = useRouter()
 const { registered_list, catalog, loading } = storeToRefs(adapter_store)
@@ -48,38 +50,31 @@ const adapter_items = computed(() => {
 })
 
 onMounted(async () => {
-  try {
-    await adapter_store.fetch_all()
-  } catch (error) {
-    toast.error(error.message || '获取适配器列表失败')
-  }
+  await run(() => adapter_store.fetch_all(), '获取适配器列表失败')
 })
 
 async function install_adapter(adapter) {
   installing_adapter.value = adapter.id
-  try {
-    await adapter_store.install(adapter.id)
+  const ok = await run(() => adapter_store.install(adapter.id), '安装适配器失败')
+  installing_adapter.value = ''
+  if (ok) {
     toast.success(`${adapter.name} 已安装并注册，重启后生效`)
     ask_restart(`适配器 ${adapter.name} 已安装，需要重启机器人生效，是否立即重启？`)
-  } catch (error) {
-    toast.error(error.message || '安装适配器失败')
-  } finally {
-    installing_adapter.value = ''
   }
 }
 
 async function toggle_adapter(adapter, enabled) {
   toggling_adapter.value = adapter.id
-  try {
-    await adapter_store.toggle_register(adapter.name, adapter.module_name, enabled)
+  const ok = await run(
+    () => adapter_store.toggle_register(adapter.name, adapter.module_name, enabled),
+    '操作失败',
+  )
+  toggling_adapter.value = ''
+  if (ok) {
     toast.success(
       enabled ? `${adapter.name} 已启用（重启后生效）` : `${adapter.name} 已禁用（重启后生效）`,
     )
     ask_restart(`适配器 ${adapter.name} 的启停需要重启机器人生效，是否立即重启？`)
-  } catch (error) {
-    toast.error(error.message || '操作失败')
-  } finally {
-    toggling_adapter.value = ''
   }
 }
 
@@ -105,16 +100,13 @@ async function do_uninstall() {
   const adapter = pending_uninstall.value
   if (!adapter) return
   uninstalling_adapter.value = adapter.module_name
-  try {
-    await adapter_store.uninstall(adapter.name, adapter.module_name)
+  const ok = await run(() => adapter_store.uninstall(adapter.name, adapter.module_name), '卸载失败')
+  uninstalling_adapter.value = ''
+  if (ok) {
     toast.success(`${adapter.name} 及其依赖已彻底删除（重启后生效）`)
     uninstall_dialog_open.value = false
     pending_uninstall.value = null
     ask_restart(`适配器 ${adapter.name} 已删除，需要重启机器人生效，是否立即重启？`)
-  } catch (error) {
-    toast.error(error.message || '卸载失败')
-  } finally {
-    uninstalling_adapter.value = ''
   }
 }
 </script>

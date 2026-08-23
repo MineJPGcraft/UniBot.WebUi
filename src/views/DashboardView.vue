@@ -42,7 +42,7 @@ const stat_items = computed(() => [
 ])
 
 onMounted(async () => {
-  server_store.fetch_server_list().catch(() => {})
+  server_store.fetch_server_list().catch((error) => console.warn('fetch_server_list failed', error))
   // 实时日志由共享 store 缓存，离开页面再回来日志仍保留
   log_store.init_live()
 })
@@ -203,10 +203,10 @@ onMounted(async () => {
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgb(22 163 74 / 0.5);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 50%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 5px rgb(22 163 74 / 0);
+    box-shadow: 0 0 0 5px transparent;
   }
 }
 

@@ -17,6 +17,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
 import JsonFormEditor from '@/components/ui/JsonFormEditor.vue'
+import DiffPreviewDialog from '@/components/config/DiffPreviewDialog.vue'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -79,6 +80,19 @@ const groups = computed(() => schema.value?.groups || [])
 const active_group_data = computed(
   () => groups.value.find((group) => group.name === active_group.value) || { keys: [] },
 )
+
+/** 当前环境变量分组对象 */
+const active_env_group_data = computed(
+  () => env_groups.value.find((group) => group.name === active_env_group.value) || { keys: [] },
+)
+
+/** 已变更字段 key 集合（Set 查找，避免模板里嵌套 some 的 O(n²) 比较） */
+const changed_keys = computed(() => new Set(changes.value.map((change) => change.key)))
+const env_changed_keys = computed(() => new Set(env_changes.value.map((change) => change.key)))
+
+function has_any_change(group, changed) {
+  return group.keys.some((key) => changed.has(key))
+}
 
 /** 分组是否被门控开关锁定（如「图片渲染」由 image.mode 门控，关闭时锁定） */
 const active_group_locked = computed(() => {
@@ -178,6 +192,7 @@ function update_list_item(key, index, value) {
 function remove_list_item(key, index) {
   const current = [...(draft_value(key) || [])]
   current.splice(index, 1)
+  remove_item_id(key, index)
   handle_update(key, current)
 }
 
@@ -191,6 +206,9 @@ function platform_item_key(key, index) {
   return item_ids[index]
 }
 
+/** 普通列表项的稳定 key（与平台列表共用同一 id 簿记，删除中间项时输入不串位） */
+const list_item_key = platform_item_key
+
 function split_platform_item(item, fallback = '') {
   const separator = String(item || '').indexOf(':')
   if (separator < 0) return { platform: fallback, target: String(item || '') }
@@ -203,10 +221,15 @@ function add_platform_item(field) {
 }
 
 function remove_platform_item(key, index) {
+  // remove_list_item 内部已同步清理稳定 key 簿记
+  remove_list_item(key, index)
+}
+
+/** 删除列表项时同步移除其稳定 key，保持 id 簿记与列表对齐 */
+function remove_item_id(key, index) {
   const item_ids = platform_item_ids.value[key] || []
   item_ids.splice(index, 1)
   platform_item_ids.value[key] = item_ids
-  remove_list_item(key, index)
 }
 
 function update_platform_item(field, index, property, value) {
@@ -245,14 +268,8 @@ function update_env_list_item(key, index, value) {
 function remove_env_list_item(key, index) {
   const current = [...(env_draft_value(key) || [])]
   current.splice(index, 1)
+  remove_item_id(key, index)
   handle_env_update(key, current)
-}
-
-function display_value(value) {
-  if (value === undefined || value === null || value === '') return '（空）'
-  if (typeof value === 'boolean') return value ? '开启' : '关闭'
-  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '（空列表）'
-  return String(value)
 }
 
 const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode']
@@ -465,10 +482,7 @@ async function confirm_messages_save() {
               @click="active_group = group.name"
             >
               {{ group.name }}
-              <span
-                v-if="group.keys.some((key) => changes.some((c) => c.key === key))"
-                class="group-dot"
-              />
+              <span v-if="has_any_change(group, changed_keys)" class="group-dot" />
             </button>
           </nav>
 
@@ -482,7 +496,7 @@ async function confirm_messages_save() {
                 :key="field.key"
                 class="field-row"
                 :class="{
-                  'field-row--changed': changes.some((c) => c.key === field.key),
+                  'field-row--changed': changed_keys.has(field.key),
                   'field-row--gate':
                     active_group_locked && field.key === active_group_data.gated_by,
                 }"
@@ -522,7 +536,7 @@ async function confirm_messages_save() {
                   <div v-else-if="field.type === 'list'" class="list-editor">
                     <div
                       v-for="(item, index) in draft_value(field.key) || []"
-                      :key="index"
+                      :key="list_item_key(field.key, index)"
                       class="list-item"
                     >
                       <Input
@@ -628,10 +642,7 @@ async function confirm_messages_save() {
               @click="active_env_group = group.name"
             >
               {{ group.name }}
-              <span
-                v-if="group.keys.some((key) => env_changes.some((c) => c.key === key))"
-                class="group-dot"
-              />
+              <span v-if="has_any_change(group, env_changed_keys)" class="group-dot" />
             </button>
           </nav>
 
@@ -642,12 +653,10 @@ async function confirm_messages_save() {
             </div>
             <div class="field-list">
               <div
-                v-for="field in env_fields_of(
-                  env_groups.find((g) => g.name === active_env_group) || { keys: [] },
-                )"
+                v-for="field in env_fields_of(active_env_group_data)"
                 :key="field.key"
                 class="field-row"
-                :class="{ 'field-row--changed': env_changes.some((c) => c.key === field.key) }"
+                :class="{ 'field-row--changed': env_changed_keys.has(field.key) }"
               >
                 <div class="field-meta">
                   <label class="field-label">
@@ -679,7 +688,7 @@ async function confirm_messages_save() {
                   <div v-else-if="field.type === 'list'" class="list-editor">
                     <div
                       v-for="(item, index) in env_draft_value(field.key) || []"
-                      :key="index"
+                      :key="list_item_key(field.key, index)"
                       class="list-item"
                     >
                       <Input
@@ -864,46 +873,26 @@ async function confirm_messages_save() {
     </Dialog>
 
     <!-- Config.toml 保存前 diff 预览 -->
-    <Dialog
-      v-model="diff_open"
+    <DiffPreviewDialog
+      :open="diff_open"
       title="确认修改"
       :description="`共 ${changes.length} 项配置将被更新`"
-      confirm-text="确认保存"
+      :changes="changes"
       :loading="saving"
+      @update:open="(value) => (diff_open = value)"
       @confirm="confirm_save"
-    >
-      <ul class="diff-list">
-        <li v-for="change in changes" :key="change.key" class="diff-item">
-          <div class="diff-label">{{ change.label }}</div>
-          <div class="diff-values mono">
-            <span class="diff-old">{{ display_value(change.old_value) }}</span>
-            <Icon icon="lucide:arrow-right" width="13" class="text-muted" />
-            <span class="diff-new">{{ display_value(change.new_value) }}</span>
-          </div>
-        </li>
-      </ul>
-    </Dialog>
+    />
 
     <!-- .env 保存前 diff 预览 -->
-    <Dialog
-      v-model="env_diff_open"
+    <DiffPreviewDialog
+      :open="env_diff_open"
       title="确认修改环境变量"
       :description="`共 ${env_changes.length} 项环境变量将被更新，保存后需重启机器人`"
-      confirm-text="确认保存"
+      :changes="env_changes"
       :loading="env_saving"
+      @update:open="(value) => (env_diff_open = value)"
       @confirm="confirm_env_save"
-    >
-      <ul class="diff-list">
-        <li v-for="change in env_changes" :key="change.key" class="diff-item">
-          <div class="diff-label">{{ change.label }}</div>
-          <div class="diff-values mono">
-            <span class="diff-old">{{ display_value(change.old_value) }}</span>
-            <Icon icon="lucide:arrow-right" width="13" class="text-muted" />
-            <span class="diff-new">{{ display_value(change.new_value) }}</span>
-          </div>
-        </li>
-      </ul>
-    </Dialog>
+    />
 
     <!-- 图片模式依赖扩展自动下载引导 -->
     <Dialog
@@ -1130,46 +1119,6 @@ async function confirm_messages_save() {
   margin-top: var(--space-1);
   color: var(--danger);
   font-size: var(--text-xs);
-}
-
-/* diff 预览 */
-.diff-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.diff-item {
-  padding: var(--space-3);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.diff-label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  margin-bottom: var(--space-1);
-}
-
-.diff-values {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-  flex-wrap: wrap;
-}
-
-.diff-old {
-  color: var(--danger);
-  text-decoration: line-through;
-}
-
-.diff-new {
-  color: var(--success);
-  font-weight: 600;
 }
 
 /* 图片模式依赖扩展引导 */
