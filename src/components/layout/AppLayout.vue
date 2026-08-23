@@ -6,6 +6,7 @@ import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 import StatusBar from './StatusBar.vue'
 import RestartPrompt from './RestartPrompt.vue'
+import UpdatePrompt from './UpdatePrompt.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useStatusStore } from '@/stores/status'
 import { use_websocket } from '@/composables/use_websocket'
@@ -43,6 +44,7 @@ onUnmounted(() => {
       <StatusBar />
     </div>
     <RestartPrompt />
+    <UpdatePrompt />
   </div>
 </template>
 
