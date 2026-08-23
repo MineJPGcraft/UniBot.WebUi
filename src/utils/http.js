@@ -36,6 +36,9 @@ export class ApiError extends Error {
 
 let refresh_promise = null
 
+/** 不依赖登录态的接口：401 时直接失败，不触发刷新重试（其余接口过期时均应刷新后重试） */
+const NO_REFRESH_PATHS = new Set(['/api/auth/login', '/api/auth/setup'])
+
 async function refresh_access_token() {
   // refresh_token 在 HttpOnly cookie 中，由后端自动读取；失效时后端返回 401
   let response
@@ -103,8 +106,9 @@ async function request(
 
   let response = await send()
 
-  // access_token 过期：尝试刷新一次后重试（登录/刷新接口除外）
-  if (response.status === 401 && auth && !path.startsWith('/api/auth/')) {
+  // access_token 过期：尝试刷新一次后重试（登录/初始化等无登录态接口除外，
+  // /api/auth/me 等认证接口过期时同样需要刷新，否则页面加载后拿不到用户权限）
+  if (response.status === 401 && auth && !NO_REFRESH_PATHS.has(path)) {
     try {
       refresh_promise = refresh_promise || refresh_access_token()
       await refresh_promise
