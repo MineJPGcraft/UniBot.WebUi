@@ -52,10 +52,13 @@ async function copy_token() {
   }
 }
 
-/** 已加载的聊天平台适配器（排除 Minecraft 适配器） */
+/**
+ * 已加载的聊天平台适配器（排除 Minecraft 适配器）
+ * adapters 为适配器注册名（由后端 get_adapters().keys() 提供，如 “Minecraft”），不是模块路径
+ */
 const chat_ready = computed(() => {
   const adapters = status.value?.adapters || []
-  return adapters.some((name) => name !== 'nonebot.adapters.minecraft')
+  return adapters.some((name) => !String(name).toLowerCase().includes('minecraft'))
 })
 
 /** 已接入 Minecraft 服务器（有在线服务器，或已配置 WS 地址） */
