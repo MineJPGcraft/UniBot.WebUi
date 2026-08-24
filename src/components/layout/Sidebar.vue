@@ -10,6 +10,7 @@ const { restarting, ask_restart } = use_restart()
 const nav_items = [
   { path: '/', label: '仪表盘', icon: 'lucide:layout-dashboard', admin_only: false },
   { path: '/servers', label: '服务器', icon: 'lucide:server', admin_only: false },
+  { path: '/statistics', label: '统计', icon: 'lucide:chart-column', admin_only: false },
   { path: '/players', label: '玩家', icon: 'lucide:users', admin_only: false },
   { path: '/config', label: '配置', icon: 'lucide:settings-2', admin_only: true },
   { path: '/logs', label: '日志', icon: 'lucide:scroll-text', admin_only: false },

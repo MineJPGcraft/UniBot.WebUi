@@ -53,6 +53,12 @@ const router = createRouter({
           meta: { title: '日志查看器' },
         },
         {
+          path: 'statistics',
+          name: 'StatisticsView',
+          component: () => import('@/views/StatisticsView.vue'),
+          meta: { title: '数据统计' },
+        },
+        {
           path: 'plugins',
           name: 'PluginsView',
           component: () => import('@/views/PluginsView.vue'),
