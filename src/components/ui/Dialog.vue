@@ -63,6 +63,10 @@ defineEmits(['confirm'])
 </template>
 
 <style scoped>
+::-webkit-scrollbar {
+  display: none;
+}
+
 .ui-dialog-overlay {
   position: fixed;
   inset: 0;
