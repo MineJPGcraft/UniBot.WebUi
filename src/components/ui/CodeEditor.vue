@@ -1,16 +1,21 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { StreamLanguage } from '@codemirror/language'
 import { toml } from '@codemirror/legacy-modes/mode/toml'
 import { properties } from '@codemirror/legacy-modes/mode/properties'
+import { yaml } from '@codemirror/legacy-modes/mode/yaml'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
-  /** 高亮语言：toml | properties */
+  /** 高亮语言：toml | properties | yaml */
   language: { type: String, default: 'toml' },
+  /** 只读模式：仅展示与选中，不可编辑（供 CodePanel 等复用） */
+  readOnly: { type: Boolean, default: false },
+  /** 最小高度，如 '0'、'200px'；默认 200px */
+  minHeight: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -18,8 +23,11 @@ const emit = defineEmits(['update:modelValue'])
 const container = ref(null)
 let view = null
 
+const container_style = computed(() => ({ minHeight: props.minHeight || '200px' }))
+
 function language_ext() {
-  return StreamLanguage.define(props.language === 'properties' ? properties : toml)
+  const modes = { toml, properties, yaml }
+  return StreamLanguage.define(modes[props.language] || toml)
 }
 
 // 匹配项目亮色主题
@@ -72,6 +80,7 @@ function extensions() {
     language_ext(),
     EditorView.lineWrapping,
     custom_theme,
+    ...(props.readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) emit('update:modelValue', update.state.doc.toString())
     }),
@@ -108,13 +117,12 @@ onBeforeUnmount(() => view?.destroy())
 </script>
 
 <template>
-  <div ref="container" class="code-editor" />
+  <div ref="container" class="code-editor" :style="container_style" />
 </template>
 
 <style scoped>
 .code-editor {
   height: 100%;
-  min-height: 200px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);

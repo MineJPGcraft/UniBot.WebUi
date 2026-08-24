@@ -12,6 +12,7 @@ import Progress from '@/components/ui/Progress.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import McConnectDialog from '@/components/McConnectDialog.vue'
 
 const router = useRouter()
 const config_store = useConfigStore()
@@ -28,6 +29,9 @@ const ready = ref(false)
 const token_dialog_open = ref(false)
 const token_loading = ref(false)
 const token_value = ref('')
+
+/** MC 服务器接入配置提示框状态 */
+const mc_connect_open = ref(false)
 
 async function open_token_dialog() {
   token_dialog_open.value = true
@@ -100,9 +104,8 @@ const steps = computed(() => [
     title: '接入 Minecraft 服务器',
     description: '安装鹊桥插件接入服务器，双方任一方主动连接均可',
     icon: 'lucide:server',
-    action_label: '查看文档',
+    action_label: '生成配置',
     done: server_ready.value,
-    target: 'https://bot.mcjpg.dev/adapter/',
   },
   {
     key: 'superuser',
@@ -121,6 +124,10 @@ const all_done = computed(() => steps.value.length > 0 && done_count.value === s
 function go(step) {
   if (step.key === 'superuser') {
     open_token_dialog()
+    return
+  }
+  if (step.key === 'server') {
+    mc_connect_open.value = true
     return
   }
   if (typeof step.target === 'string') {
@@ -221,6 +228,8 @@ onMounted(async () => {
         </p>
       </div>
     </Dialog>
+
+    <McConnectDialog v-model="mc_connect_open" />
   </div>
 </template>
 

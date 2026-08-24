@@ -155,6 +155,12 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  /** 直接写入指定 .env 键值（引导场景用），写入后刷新缓存 */
+  async function save_env_fields(fields) {
+    await http.patch('/api/config/env', fields)
+    await fetch_env()
+  }
+
   /** 获取 Config.toml 与 .env 的原始文本内容 */
   async function fetch_raw() {
     raw_loading.value = true
@@ -238,6 +244,7 @@ export const useConfigStore = defineStore('config', () => {
     update_env_field,
     reset_env_draft,
     save_env_changes,
+    save_env_fields,
     // 原始文件编辑
     raw_config,
     raw_env,
