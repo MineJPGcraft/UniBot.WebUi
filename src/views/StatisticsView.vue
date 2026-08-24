@@ -66,11 +66,14 @@ const trend_items = computed(() =>
   })),
 )
 
-/** 活跃群聊排行（相对条形宽度） */
+const chart_type_options = [
+  { value: 'bar', label: '柱状图' },
+  { value: 'line', label: '折线图' },
+]
+const chart_type = ref('bar')
+
+/** 活跃群聊排行 */
 const active_groups = computed(() => statistics.value?.groups || [])
-const max_group_count = computed(() =>
-  Math.max(1, ...active_groups.value.map((group) => group.received)),
-)
 
 /** 平台分布（相对条形宽度） */
 const platform_rank = computed(() => statistics.value?.platforms || [])
@@ -146,10 +149,13 @@ onUnmounted(() => clearInterval(refresh_timer))
     <section class="card trend-card">
       <div class="card-header">
         <h3 class="card-title">消息趋势</h3>
-        <Badge variant="neutral">{{ trend_days }} 天</Badge>
+        <div class="trend-actions">
+          <Select v-model="chart_type" :options="chart_type_options" />
+          <Badge variant="neutral">{{ trend_days }} 天</Badge>
+        </div>
       </div>
       <div class="card-body">
-        <TrendChart :items="trend_items" :series="trend_series" />
+        <TrendChart :items="trend_items" :series="trend_series" :type="chart_type" />
       </div>
     </section>
 
@@ -172,13 +178,7 @@ onUnmounted(() => clearInterval(refresh_timer))
               <Icon icon="lucide:message-circle" width="15" class="group-icon" />
               <div class="group-info">
                 <span class="group-name">{{ group.name || group.key }}</span>
-                <span class="group-key mono">{{ group.name ? group.key : '' }}</span>
-                <div class="group-bar-track">
-                  <div
-                    class="group-bar"
-                    :style="{ width: `${(group.received / max_group_count) * 100}%` }"
-                  />
-                </div>
+                <span v-if="group.name" class="group-key mono">{{ group.key }}</span>
               </div>
               <div class="group-meta">
                 <span class="group-count">{{ group.received }}</span>
@@ -316,6 +316,12 @@ onUnmounted(() => clearInterval(refresh_timer))
   margin-bottom: var(--space-5);
 }
 
+.trend-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 /* 双栏明细 */
 .detail-grid {
   display: grid;
@@ -375,20 +381,6 @@ onUnmounted(() => clearInterval(refresh_timer))
 .group-key {
   font-size: var(--text-xs);
   color: var(--text-muted);
-}
-
-.group-bar-track {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-
-.group-bar {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-  transition: width var(--transition);
 }
 
 .group-meta {

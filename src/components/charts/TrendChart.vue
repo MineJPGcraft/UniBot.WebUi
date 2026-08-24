@@ -2,18 +2,24 @@
 import { computed } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
-import { BarChart } from 'echarts/charts'
+import { BarChart, LineChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 
-// 按需注册：柱状图 + 网格/图例/提示框 + Canvas 渲染
-use([BarChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
+// 按需注册：柱状/折线 + 网格/图例/提示框 + Canvas 渲染
+use([BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
 const props = defineProps({
   /** 数据项：[{ label: '2026-08-24', ...series.key ]} */
   items: { type: Array, required: true },
   /** 序列定义：[{ key: 'received', name: '接收', color: '#2563eb' }] */
   series: { type: Array, required: true },
+  /** 图表类型：bar | line */
+  type: {
+    type: String,
+    default: 'bar',
+    validator: (value) => ['bar', 'line'].includes(value),
+  },
 })
 
 /** ECharts 用 canvas 渲染，颜色需为字面量，无法解析 CSS 变量 */
@@ -52,10 +58,20 @@ const chart_option = computed(() => ({
   },
   series: props.series.map((serie) => ({
     name: serie.name,
-    type: 'bar',
+    type: props.type,
     data: props.items.map((item) => Number(item[serie.key]) || 0),
-    itemStyle: { color: serie.color, borderRadius: [2, 2, 0, 0] },
-    barMaxWidth: 14,
+    ...(props.type === 'line'
+      ? {
+          color: serie.color,
+          smooth: true,
+          showSymbol: false,
+          lineStyle: { width: 2 },
+          emphasis: { focus: 'series' },
+        }
+      : {
+          itemStyle: { color: serie.color, borderRadius: [2, 2, 0, 0] },
+          barMaxWidth: 14,
+        }),
   })),
 }))
 </script>
