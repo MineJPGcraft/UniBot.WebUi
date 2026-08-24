@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "format": "oxfmt src/"
+    "check:locales": "bun scripts/check-locales.mjs",
+    "dev": "vite",
+    "format": "oxfmt src/",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@codemirror/legacy-modes": "^6.5.3",
@@ -18,6 +19,7 @@
     "reka-ui": "^2.10.1",
     "vue": "^3.5.38",
     "vue-echarts": "^8.1.0",
+    "vue-i18n": "^11.4.9",
     "vue-router": "^5.1.0"
   },
   "devDependencies": {

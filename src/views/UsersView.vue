@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
@@ -19,6 +20,7 @@ import { role_label, format_datetime } from '@/utils/format'
 
 const user_store = useUserStore()
 const auth_store = useAuthStore()
+const { t } = useI18n()
 const toast = use_toast()
 const { run } = use_async_action()
 const { user_list, total, page, page_size, keyword, loading } = storeToRefs(user_store)
@@ -26,11 +28,11 @@ const { user_list, total, page, page_size, keyword, loading } = storeToRefs(user
 const search_text = ref('')
 const submitting = ref(false)
 
-const role_options = [
-  { value: 'admin', label: '管理员' },
-  { value: 'operator', label: '操作员' },
-  { value: 'viewer', label: '观察者' },
-]
+const role_options = computed(() => [
+  { value: 'admin', label: t('users.role_admin') },
+  { value: 'operator', label: t('users.role_operator') },
+  { value: 'viewer', label: t('users.role_viewer') },
+])
 
 const role_badge_variant = { admin: 'accent', operator: 'success', viewer: 'neutral' }
 
@@ -55,7 +57,7 @@ onMounted(() => {
 })
 
 async function refresh() {
-  await run(() => user_store.fetch_users(), '获取用户列表失败')
+  await run(() => user_store.fetch_users(), t('users.fetch_failed'))
 }
 
 function handle_search() {
@@ -71,7 +73,7 @@ function handle_page_change(target_page) {
 async function submit_create() {
   const { username, password, nickname, role } = create_form.value
   if (!username.trim() || !password.trim()) {
-    toast.error('请填写用户名和密码')
+    toast.error(t('users.create_missing_fields'))
     return
   }
   const ok = await run(
@@ -82,11 +84,11 @@ async function submit_create() {
         nickname: nickname.trim() || username.trim(),
         role,
       }),
-    '创建失败',
+    t('users.create_failed'),
     submitting,
   )
   if (ok) {
-    toast.success('用户创建成功')
+    toast.success(t('users.create_success'))
     create_form.value = { username: '', password: '', nickname: '', role: 'viewer' }
     create_open.value = false
   }
@@ -104,11 +106,11 @@ async function submit_edit() {
         nickname: edit_form.value.nickname,
         role: edit_form.value.role,
       }),
-    '更新失败',
+    t('users.update_failed'),
     submitting,
   )
   if (ok) {
-    toast.success('用户信息已更新')
+    toast.success(t('users.update_success'))
     edit_open.value = false
   }
 }
@@ -120,16 +122,16 @@ function open_reset(user) {
 
 async function submit_reset() {
   if (!reset_form.value.password) {
-    toast.error('请输入新密码')
+    toast.error(t('users.reset_missing_password'))
     return
   }
   const ok = await run(
     () => user_store.reset_password(reset_form.value.user_id, reset_form.value.password),
-    '重置失败',
+    t('users.reset_failed'),
     submitting,
   )
   if (ok) {
-    toast.success('密码已重置')
+    toast.success(t('users.reset_success'))
     reset_open.value = false
   }
 }
@@ -141,11 +143,11 @@ function confirm_delete(user) {
 async function submit_delete() {
   const ok = await run(
     () => user_store.delete_user(delete_target.value.user_id),
-    '删除失败',
+    t('users.delete_failed'),
     deleting,
   )
   if (ok) {
-    toast.success('用户已删除')
+    toast.success(t('users.delete_success'))
     delete_target.value = null
   }
 }
@@ -153,11 +155,19 @@ async function submit_delete() {
 function row_menu_items(user) {
   const is_self = user.user_id === auth_store.user?.user_id
   return [
-    { label: '编辑资料', icon: 'lucide:pencil', on_select: () => open_edit(user) },
-    { label: '重置密码', icon: 'lucide:key-round', on_select: () => open_reset(user) },
+    {
+      label: t('users.menu_edit_profile'),
+      icon: 'lucide:pencil',
+      on_select: () => open_edit(user),
+    },
+    {
+      label: t('users.menu_reset_password'),
+      icon: 'lucide:key-round',
+      on_select: () => open_reset(user),
+    },
     { separator: true },
     {
-      label: '删除用户',
+      label: t('users.menu_delete_user'),
       icon: 'lucide:trash-2',
       danger: true,
       disabled: is_self,
@@ -171,13 +181,13 @@ function row_menu_items(user) {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">用户管理</h1>
-        <p class="page-desc">管理 WebUI 账户与角色权限</p>
+        <h1 class="page-title">{{ t('users.page_title') }}</h1>
+        <p class="page-desc">{{ t('users.page_description') }}</p>
       </div>
       <div class="page-actions">
         <Button variant="primary" @click="create_open = true">
           <Icon icon="lucide:user-plus" width="15" />
-          新建用户
+          {{ t('users.create_user') }}
         </Button>
       </div>
     </div>
@@ -188,7 +198,7 @@ function row_menu_items(user) {
           <Icon icon="lucide:search" width="15" class="search-icon" />
           <Input
             v-model="search_text"
-            placeholder="搜索用户名或昵称…"
+            :placeholder="t('users.search_placeholder')"
             @keydown.enter="handle_search"
           />
         </form>
@@ -198,24 +208,24 @@ function row_menu_items(user) {
       </div>
 
       <div v-if="loading && user_list.length === 0" class="loading-block">
-        <Spinner :size="18" /> 加载中…
+        <Spinner :size="18" /> {{ t('common.loading') }}
       </div>
 
       <EmptyState
         v-else-if="user_list.length === 0"
         icon="lucide:users"
-        title="暂无用户"
-        :description="keyword ? `没有匹配 “${keyword}” 的用户` : ''"
+        :title="t('users.empty_title')"
+        :description="keyword ? t('users.empty_search_result', { keyword }) : ''"
       />
 
       <table v-else class="ui-table">
         <thead>
           <tr>
-            <th>用户</th>
-            <th>角色</th>
-            <th>创建时间</th>
-            <th>最后登录</th>
-            <th class="col-actions">操作</th>
+            <th>{{ t('users.column_user') }}</th>
+            <th>{{ t('users.column_role') }}</th>
+            <th>{{ t('users.column_created_at') }}</th>
+            <th>{{ t('users.column_last_login') }}</th>
+            <th class="col-actions">{{ t('users.column_actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -226,9 +236,9 @@ function row_menu_items(user) {
                 <div class="user-text">
                   <span class="user-nickname">
                     {{ user.nickname || user.username }}
-                    <Badge v-if="user.user_id === auth_store.user?.user_id" variant="accent"
-                      >我</Badge
-                    >
+                    <Badge v-if="user.user_id === auth_store.user?.user_id" variant="accent">{{
+                      t('users.self_badge')
+                    }}</Badge>
                   </span>
                   <span class="user-username mono">@{{ user.username }}</span>
                 </div>
@@ -265,25 +275,29 @@ function row_menu_items(user) {
     <!-- 新建用户 -->
     <Dialog
       v-model="create_open"
-      title="新建用户"
-      confirm-text="创建"
+      :title="t('users.create_dialog_title')"
+      :confirm-text="t('users.create_confirm')"
       :loading="submitting"
       @confirm="submit_create"
     >
       <div class="form-row">
-        <label class="form-label">用户名</label>
-        <Input v-model="create_form.username" placeholder="登录用户名" />
+        <label class="form-label">{{ t('users.field_username') }}</label>
+        <Input v-model="create_form.username" :placeholder="t('users.username_placeholder')" />
       </div>
       <div class="form-row">
-        <label class="form-label">昵称</label>
-        <Input v-model="create_form.nickname" placeholder="显示名称（可选）" />
+        <label class="form-label">{{ t('users.field_nickname') }}</label>
+        <Input v-model="create_form.nickname" :placeholder="t('users.nickname_placeholder')" />
       </div>
       <div class="form-row">
-        <label class="form-label">密码</label>
-        <Input v-model="create_form.password" type="password" placeholder="初始密码" />
+        <label class="form-label">{{ t('users.field_password') }}</label>
+        <Input
+          v-model="create_form.password"
+          type="password"
+          :placeholder="t('users.password_placeholder')"
+        />
       </div>
       <div class="form-row">
-        <label class="form-label">角色</label>
+        <label class="form-label">{{ t('users.field_role') }}</label>
         <Select v-model="create_form.role" :options="role_options" />
       </div>
     </Dialog>
@@ -291,49 +305,53 @@ function row_menu_items(user) {
     <!-- 编辑用户 -->
     <Dialog
       v-model="edit_open"
-      title="编辑用户"
-      confirm-text="保存"
+      :title="t('users.edit_dialog_title')"
+      :confirm-text="t('common.save')"
       :loading="submitting"
       @confirm="submit_edit"
     >
       <div class="form-row">
-        <label class="form-label">昵称</label>
+        <label class="form-label">{{ t('users.field_nickname') }}</label>
         <Input v-model="edit_form.nickname" />
       </div>
       <div class="form-row">
-        <label class="form-label">角色</label>
+        <label class="form-label">{{ t('users.field_role') }}</label>
         <Select
           v-model="edit_form.role"
           :options="role_options"
           :disabled="edit_form.user_id === auth_store.user?.user_id"
         />
-        <span v-if="edit_form.user_id === auth_store.user?.user_id" class="form-hint"
-          >不可修改自己的角色</span
-        >
+        <span v-if="edit_form.user_id === auth_store.user?.user_id" class="form-hint">{{
+          t('users.self_role_hint')
+        }}</span>
       </div>
     </Dialog>
 
     <!-- 重置密码 -->
     <Dialog
       v-model="reset_open"
-      title="重置密码"
-      :description="`为用户 @${reset_form.username} 设置新密码`"
-      confirm-text="重置"
+      :title="t('users.reset_dialog_title')"
+      :description="t('users.reset_dialog_description', { username: reset_form.username })"
+      :confirm-text="t('users.reset_confirm')"
       :loading="submitting"
       @confirm="submit_reset"
     >
       <div class="form-row">
-        <label class="form-label">新密码</label>
-        <Input v-model="reset_form.password" type="password" placeholder="输入新密码" />
+        <label class="form-label">{{ t('users.new_password_field') }}</label>
+        <Input
+          v-model="reset_form.password"
+          type="password"
+          :placeholder="t('users.new_password_placeholder')"
+        />
       </div>
     </Dialog>
 
     <!-- 删除确认 -->
     <Dialog
       :model-value="Boolean(delete_target)"
-      title="删除用户"
-      :description="`确定要删除用户 @${delete_target?.username} 吗？此操作不可恢复。`"
-      confirm-text="删除"
+      :title="t('users.delete_dialog_title')"
+      :description="t('users.delete_dialog_description', { username: delete_target?.username })"
+      :confirm-text="t('common.delete')"
       confirm-variant="danger"
       :loading="deleting"
       @update:model-value="(open) => !open && (delete_target = null)"

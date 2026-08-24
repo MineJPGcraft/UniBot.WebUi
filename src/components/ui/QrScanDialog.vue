@@ -1,10 +1,13 @@
 <script setup>
 import { onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import Dialog from './Dialog.vue'
 import Button from './Button.vue'
 import Spinner from './Spinner.vue'
 import { use_qq_qr_connect, QR_LOGIN_STATE } from '@/composables/use_qq_qr_connect'
+
+const { t } = useI18n()
 
 const props = defineProps({
   /** 弹窗开关 */
@@ -47,7 +50,7 @@ async function start_scan() {
     // 后台轮询，直到终态
     poll_task = poll_until_done()
   } catch (error) {
-    error_message.value = error.message || '启动扫码登录失败'
+    error_message.value = error.message || t('ui.qr_start_failed')
   }
 }
 
@@ -62,12 +65,12 @@ async function poll_until_done() {
       })
       emit('update:open', false)
     } else if (result.state === QR_LOGIN_STATE.FAILED) {
-      error_message.value = result.error || '扫码失败'
+      error_message.value = result.error || t('ui.qr_login_failed')
     } else if (result.state === QR_LOGIN_STATE.CANCELLED) {
       // 用户主动取消，静默关闭
     }
   } catch (error) {
-    error_message.value = error.message || '扫码等待超时'
+    error_message.value = error.message || t('ui.qr_poll_timeout')
   }
 }
 
@@ -89,8 +92,8 @@ function close() {
 <template>
   <Dialog
     :open="open"
-    title="QQ 扫码绑定"
-    description="使用手机 QQ 扫描下方二维码，确认后自动填充 AppID 与 Secret"
+    :title="t('ui.qr_title')"
+    :description="t('ui.qr_description')"
     :hide-footer="true"
     width="min(360px, calc(100vw - 32px))"
     @update:open="(value) => emit('update:open', value)"
@@ -98,18 +101,18 @@ function close() {
     <div class="qr-scan">
       <div v-if="creating" class="qr-scan__loading">
         <Spinner :size="20" />
-        <span>正在生成二维码…</span>
+        <span>{{ t('ui.qr_generating') }}</span>
       </div>
 
       <template v-else-if="show_qr && login?.qr_image">
-        <img :src="login.qr_image" alt="QQ 扫码二维码" class="qr-scan__image" />
+        <img :src="login.qr_image" :alt="t('ui.qr_image_alt')" class="qr-scan__image" />
         <p class="qr-scan__hint">
           <Icon icon="lucide:smartphone" width="14" />
-          打开手机 QQ，使用「扫一扫」扫描二维码
+          {{ t('ui.qr_scan_hint') }}
         </p>
         <p v-if="polling" class="qr-scan__status">
           <Spinner :size="12" />
-          等待扫码确认…
+          {{ t('ui.qr_waiting_confirm') }}
         </p>
       </template>
 
@@ -119,7 +122,7 @@ function close() {
       </div>
 
       <div class="qr-scan__footer">
-        <Button variant="ghost" size="sm" @click="close">关闭</Button>
+        <Button variant="ghost" size="sm" @click="close">{{ t('common.close') }}</Button>
         <Button
           v-if="error_message"
           variant="secondary"
@@ -127,7 +130,7 @@ function close() {
           :loading="creating"
           @click="start_scan"
         >
-          重新生成
+          {{ t('ui.qr_regenerate') }}
         </Button>
       </div>
     </div>

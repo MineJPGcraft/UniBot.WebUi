@@ -1,10 +1,12 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useStatusStore } from '@/stores/status'
 import { use_poem } from '@/composables/use_poem'
 import { format_uptime, format_mb } from '@/utils/format'
 
+const { t } = useI18n()
 const status_store = useStatusStore()
 const { status } = storeToRefs(status_store)
 
@@ -19,13 +21,18 @@ onMounted(load_poem)
   <footer class="statusbar">
     <span>UniBot {{ status?.version || '—' }}</span>
     <span class="statusbar-sep">·</span>
-    <span>运行 {{ uptime_text }}</span>
+    <span>{{ t('layout.statusbar_uptime', { uptime: uptime_text }) }}</span>
     <span class="statusbar-sep">·</span>
-    <span>内存 {{ format_mb(status?.memory_mb) }}</span>
+    <span>{{ t('layout.statusbar_memory', { memory: format_mb(status?.memory_mb) }) }}</span>
     <span class="statusbar-sep">·</span>
-    <span>CPU {{ status?.cpu_percent ?? '—' }}%</span>
-    <span v-if="loading" class="statusbar-poem">正在加载诗词…</span>
-    <span v-else-if="poem" class="statusbar-poem" title="点击换一句" @click="load_poem()">
+    <span>{{ t('layout.statusbar_cpu', { cpu: status?.cpu_percent ?? '—' }) }}</span>
+    <span v-if="loading" class="statusbar-poem">{{ t('layout.statusbar_poem_loading') }}</span>
+    <span
+      v-else-if="poem"
+      class="statusbar-poem"
+      :title="t('layout.statusbar_poem_hint')"
+      @click="load_poem()"
+    >
       {{ poem }}
     </span>
   </footer>

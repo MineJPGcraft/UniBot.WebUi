@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { usePluginStore } from '@/stores/plugin'
@@ -15,6 +16,7 @@ import MarketPanel from '@/components/MarketPanel.vue'
 
 const plugin_store = usePluginStore()
 const auth_store = useAuthStore()
+const { t } = useI18n()
 const toast = use_toast()
 const { ask_restart } = use_restart()
 const {
@@ -34,15 +36,18 @@ const toggling = ref('')
 const removing_item = ref('')
 const market_action = ref('')
 
-const tabs = [
-  { value: 'installed', label: '已安装', icon: 'lucide:puzzle' },
-  { value: 'market', label: '插件市场', icon: 'lucide:store' },
-]
+const tabs = computed(() => [
+  { value: 'installed', label: t('plugins.tab_installed'), icon: 'lucide:puzzle' },
+  { value: 'market', label: t('plugins.tab_market'), icon: 'lucide:store' },
+])
 
-const hint =
-  '插件均来自 NoneBot2 官方插件商店，安装后请参考插件 Github 说明，前往 .env 自行配置参数。'
+const hint = computed(() => t('plugins.market_hint'))
 
-const type_labels = { builtin: '内置插件', dependency: '依赖插件', external: '外部插件' }
+const type_labels = computed(() => ({
+  builtin: t('plugins.type_builtin'),
+  dependency: t('plugins.type_dependency'),
+  external: t('plugins.type_external'),
+}))
 
 onMounted(() => {
   refresh_installed()
@@ -56,24 +61,23 @@ async function refresh_installed() {
   try {
     await plugin_store.fetch_installed()
   } catch (error) {
-    toast.error(error.message || '获取插件列表失败')
+    toast.error(error.message || t('plugins.fetch_list_failed'))
   }
 }
 
 async function toggle_plugin(plugin, enabled) {
+  const display_name = plugin.display_name || plugin.name
   toggling.value = plugin.name
   try {
     await plugin_store.set_enabled(plugin.name, enabled)
     toast.success(
       enabled
-        ? `已启用 ${plugin.display_name || plugin.name}`
-        : `已禁用 ${plugin.display_name || plugin.name}`,
+        ? t('plugins.enable_success', { name: display_name })
+        : t('plugins.disable_success', { name: display_name }),
     )
-    ask_restart(
-      `插件 ${plugin.display_name || plugin.name} 的启停需要重启机器人生效，是否立即重启？`,
-    )
+    ask_restart(t('plugins.restart_after_toggle_confirm', { name: display_name }))
   } catch (error) {
-    toast.error(error.message || '操作失败')
+    toast.error(error.message || t('common.operation_failed'))
   } finally {
     toggling.value = ''
   }
@@ -84,15 +88,14 @@ function can_remove_plugin(plugin) {
 }
 
 async function remove_plugin(plugin) {
+  const display_name = plugin.display_name || plugin.name
   removing_item.value = plugin.module_name
   try {
     await plugin_store.remove_plugin(plugin.module_name)
-    toast.success(`${plugin.display_name || plugin.name} 已删除，重启后生效`)
-    ask_restart(
-      `插件 ${plugin.display_name || plugin.name} 已删除，需要重启机器人生效，是否立即重启？`,
-    )
+    toast.success(t('plugins.remove_success', { name: display_name }))
+    ask_restart(t('plugins.restart_after_remove_confirm', { name: display_name }))
   } catch (error) {
-    toast.error(error.message || '删除插件失败')
+    toast.error(error.message || t('plugins.remove_failed'))
   } finally {
     removing_item.value = ''
   }
@@ -102,7 +105,7 @@ async function search_market() {
   try {
     await plugin_store.fetch_market({ page: 1, keyword: market_keyword.value.trim() })
   } catch (error) {
-    toast.error(error.message || '获取市场列表失败')
+    toast.error(error.message || t('plugins.fetch_market_failed'))
   }
 }
 
@@ -110,7 +113,7 @@ async function go_market_page(page) {
   try {
     await plugin_store.go_market_page(page)
   } catch (error) {
-    toast.error(error.message || '加载失败')
+    toast.error(error.message || t('plugins.load_page_failed'))
   }
 }
 
@@ -118,11 +121,11 @@ async function install_market_plugin(item) {
   market_action.value = item.module_name
   try {
     await plugin_store.install_plugin(item.project_link)
-    toast.success(`插件 ${item.name} 安装成功，重启后生效`)
+    toast.success(t('plugins.install_success', { name: item.name }))
     await refresh_after_market_action()
-    ask_restart(`插件 ${item.name} 安装成功，需要重启机器人生效，是否立即重启？`)
+    ask_restart(t('plugins.restart_after_install_confirm', { name: item.name }))
   } catch (error) {
-    toast.error(error.message || '安装失败')
+    toast.error(error.message || t('plugins.install_failed'))
   } finally {
     market_action.value = ''
   }
@@ -132,11 +135,11 @@ async function upgrade_market_plugin(item) {
   market_action.value = item.module_name
   try {
     await plugin_store.upgrade_plugin(item.project_link)
-    toast.success(`插件 ${item.name} 升级成功，重启后生效`)
+    toast.success(t('plugins.upgrade_success', { name: item.name }))
     await refresh_after_market_action()
-    ask_restart(`插件 ${item.name} 升级成功，需要重启机器人生效，是否立即重启？`)
+    ask_restart(t('plugins.restart_after_upgrade_confirm', { name: item.name }))
   } catch (error) {
-    toast.error(error.message || '升级失败')
+    toast.error(error.message || t('plugins.upgrade_failed'))
   } finally {
     market_action.value = ''
   }
@@ -152,17 +155,19 @@ async function refresh_after_market_action() {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">插件管理</h1>
-        <p class="page-desc">管理已安装插件，或从市场发现新插件</p>
+        <h1 class="page-title">{{ t('plugins.page_title') }}</h1>
+        <p class="page-desc">{{ t('plugins.page_description') }}</p>
       </div>
     </div>
 
     <Tabs v-model="active_tab" :tabs="tabs">
       <template #installed>
         <div v-if="loading" class="card">
-          <div class="loading-block"><Spinner :size="18" /> 加载中…</div>
+          <div class="loading-block"><Spinner :size="18" /> {{ t('common.loading') }}</div>
         </div>
-        <p v-else-if="installed_list.length === 0" class="plugin-empty-hint">未发现有加载的插件</p>
+        <p v-else-if="installed_list.length === 0" class="plugin-empty-hint">
+          {{ t('plugins.empty_installed') }}
+        </p>
         <div v-else class="plugin-grid">
           <article v-for="plugin in installed_list" :key="plugin.name" class="plugin-card card">
             <div class="plugin-head">
@@ -174,12 +179,12 @@ async function refresh_after_market_action() {
               <Badge variant="neutral">{{ type_labels[plugin.type] || plugin.type }}</Badge>
             </div>
 
-            <p class="plugin-desc">{{ plugin.description || '暂无描述' }}</p>
+            <p class="plugin-desc">{{ plugin.description || t('plugins.no_description') }}</p>
 
             <div class="plugin-foot">
               <div class="plugin-meta">
                 <span class="mono">{{ plugin.version }}</span>
-                <span class="text-muted">· {{ plugin.author || '未知作者' }}</span>
+                <span class="text-muted">· {{ plugin.author || t('plugins.unknown_author') }}</span>
               </div>
               <div class="plugin-actions">
                 <Switch
@@ -194,7 +199,7 @@ async function refresh_after_market_action() {
                   variant="ghost"
                   size="sm"
                   icon-only
-                  title="删除插件"
+                  :title="t('plugins.remove_button_title')"
                   :disabled="!auth_store.is_admin || Boolean(removing_item)"
                   :loading="removing_item === plugin.module_name"
                   @click="remove_plugin(plugin)"
@@ -212,7 +217,7 @@ async function refresh_after_market_action() {
           :model-value="market_keyword"
           :items="market_items"
           :loading="market_loading"
-          placeholder="搜索插件…"
+          :placeholder="t('plugins.search_placeholder')"
           :hint="hint"
           :total="market_total"
           :page="market_page"

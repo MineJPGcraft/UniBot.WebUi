@@ -1,21 +1,24 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { use_websocket } from '@/composables/use_websocket'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
+import { current_locale, set_locale, LOCALES } from '@/i18n'
 import { role_label } from '@/utils/format'
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const auth_store = useAuthStore()
 const { user } = storeToRefs(auth_store)
 const { connection_state } = use_websocket()
 
-const breadcrumb = computed(() => route.meta.title || '仪表盘')
+const breadcrumb = computed(() => t(route.meta.title_key || 'nav.dashboard'))
 
 const ws_dot_class = computed(() => {
   if (connection_state.value === 'connected') return 'ws-dot--connected'
@@ -24,16 +27,16 @@ const ws_dot_class = computed(() => {
 })
 
 const ws_text = computed(() => {
-  if (connection_state.value === 'connected') return '实时连接正常'
-  if (connection_state.value === 'connecting') return '正在连接…'
-  return '实时连接断开'
+  if (connection_state.value === 'connected') return t('nav.ws_connected')
+  if (connection_state.value === 'connecting') return t('nav.ws_connecting')
+  return t('nav.ws_disconnected')
 })
 
 const user_menu_items = computed(() => [
-  { label: '个人设置', icon: 'lucide:user', on_select: () => router.push('/settings') },
+  { label: t('nav.user_settings'), icon: 'lucide:user', on_select: () => router.push('/settings') },
   { separator: true },
   {
-    label: '退出登录',
+    label: t('nav.logout'),
     icon: 'lucide:log-out',
     danger: true,
     on_select: async () => {
@@ -46,6 +49,15 @@ const user_menu_items = computed(() => [
 const avatar_text = computed(() =>
   (user.value?.nickname || user.value?.username || '?').slice(0, 1),
 )
+
+function next_locale() {
+  const index = LOCALES.findIndex((item) => item.value === current_locale())
+  return LOCALES[(index + 1) % LOCALES.length].value
+}
+
+function toggle_locale() {
+  set_locale(next_locale())
+}
 </script>
 
 <template>
@@ -59,6 +71,12 @@ const avatar_text = computed(() =>
         <span class="ws-indicator">
           <span class="ws-dot" :class="ws_dot_class" />
         </span>
+      </Tooltip>
+
+      <Tooltip :text="t('nav.switch_language')">
+        <button class="locale-toggle" @click="toggle_locale">
+          <Icon icon="lucide:languages" width="16" />
+        </button>
       </Tooltip>
 
       <DropdownMenu :items="user_menu_items">
@@ -110,6 +128,22 @@ const avatar_text = computed(() =>
   width: 28px;
   height: 28px;
   cursor: default;
+}
+
+.locale-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  transition: background-color var(--transition);
+}
+
+.locale-toggle:hover {
+  background: rgb(0 0 0 / 0.04);
+  color: var(--text);
 }
 
 .ws-dot {

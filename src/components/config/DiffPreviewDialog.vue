@@ -5,6 +5,7 @@
  */
 import { Icon } from '@iconify/vue'
 import Dialog from '@/components/ui/Dialog.vue'
+import { useI18n } from 'vue-i18n'
 
 defineProps({
   /** 弹窗开关 */
@@ -18,10 +19,18 @@ defineProps({
 
 const emit = defineEmits(['update:open', 'confirm'])
 
+const { t } = useI18n()
+
 function display_value(value) {
-  if (value === undefined || value === null || value === '') return '（空）'
-  if (typeof value === 'boolean') return value ? '开启' : '关闭'
-  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '（空列表）'
+  if (value === undefined || value === null || value === '') {
+    return t('config_view.diff_empty_value')
+  }
+  if (typeof value === 'boolean') {
+    return value ? t('config_view.diff_value_on') : t('config_view.diff_value_off')
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(', ') : t('config_view.diff_empty_list')
+  }
   return String(value)
 }
 </script>
@@ -31,7 +40,7 @@ function display_value(value) {
     :open="open"
     :title="title"
     :description="description"
-    confirm-text="确认保存"
+    :confirm-text="t('config_view.diff_confirm_save')"
     :loading="loading"
     @update:open="(value) => emit('update:open', value)"
     @confirm="emit('confirm')"

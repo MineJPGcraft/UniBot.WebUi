@@ -1,6 +1,8 @@
 <!-- 通用市场面板：搜索工具栏 + 卡片网格 + 分页，供插件市场 / 扩展市场复用 -->
 <script setup>
+import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -12,11 +14,12 @@ const props = defineProps({
   items: { type: Array, required: true },
   loading: { type: Boolean, default: false },
   modelValue: { type: String, default: '' },
-  placeholder: { type: String, default: '搜索…' },
+  /** 为空时回退到模块默认文案 */
+  placeholder: { type: String, default: '' },
   /** 工具栏右侧提示文案，为空则不显示 */
   hint: { type: String, default: '' },
-  emptyTitle: { type: String, default: '未找到相关项目' },
-  emptyDescription: { type: String, default: '换个关键词试试，或检查网络连接后重新搜索' },
+  emptyTitle: { type: String, default: '' },
+  emptyDescription: { type: String, default: '' },
   /** 分页配置；total 为 0 时不显示分页 */
   total: { type: Number, default: 0 },
   page: { type: Number, default: 1 },
@@ -31,6 +34,16 @@ const props = defineProps({
 
 const emit = defineEmits(['update:model-value', 'search', 'page-change', 'install', 'upgrade'])
 
+const { t } = useI18n()
+
+const search_placeholder = computed(
+  () => props.placeholder || t('extensions.market_search_placeholder'),
+)
+const empty_title_text = computed(() => props.emptyTitle || t('extensions.market_empty_title'))
+const empty_description_text = computed(
+  () => props.emptyDescription || t('extensions.market_empty_description'),
+)
+
 function item_key(item) {
   return item.module_name || item.id || item.project_link || ''
 }
@@ -40,7 +53,7 @@ function is_official(item) {
 }
 
 function item_desc(item) {
-  return item.description || item.desc || '暂无描述'
+  return item.description || item.desc || t('extensions.market_no_description')
 }
 
 function item_version(item) {
@@ -113,23 +126,25 @@ function upgrade(item) {
       <Input
         :model-value="modelValue"
         class="market-search"
-        :placeholder="placeholder"
+        :placeholder="search_placeholder"
         @update:model-value="(value) => emit('update:model-value', value)"
         @keydown.enter="search"
       />
       <Button variant="secondary" type="submit" :loading="loading">
         <Icon icon="lucide:search" width="14" />
-        搜索
+        {{ t('extensions.market_search') }}
       </Button>
       <p v-if="hint" class="market-hint">{{ hint }}</p>
     </form>
 
-    <div v-if="loading" class="loading-block"><Spinner :size="18" /> 加载中…</div>
+    <div v-if="loading" class="loading-block">
+      <Spinner :size="18" /> {{ t('extensions.market_loading') }}
+    </div>
     <EmptyState
       v-else-if="items.length === 0"
       icon="lucide:store"
-      :title="emptyTitle"
-      :description="emptyDescription"
+      :title="empty_title_text"
+      :description="empty_description_text"
     />
     <div v-else class="market-grid">
       <article v-for="item in items" :key="item_key(item)" class="market-card card">
@@ -138,12 +153,18 @@ function upgrade(item) {
           <div class="market-title">
             <h3 class="market-item-title">
               {{ item.name }}
-              <Badge v-if="is_official(item)" variant="success">官方</Badge>
+              <Badge v-if="is_official(item)" variant="success">
+                {{ t('extensions.market_official_badge') }}
+              </Badge>
             </h3>
             <span class="market-name mono">{{ item_key(item) }}</span>
           </div>
-          <Badge v-if="item.installed" variant="neutral">已安装</Badge>
-          <Badge v-else-if="item.registered" variant="warning">已登记</Badge>
+          <Badge v-if="item.installed" variant="neutral">
+            {{ t('extensions.market_installed_badge') }}
+          </Badge>
+          <Badge v-else-if="item.registered" variant="warning">
+            {{ t('extensions.market_registered_badge') }}
+          </Badge>
         </div>
 
         <p class="market-desc">{{ item_desc(item) }}</p>
@@ -168,7 +189,7 @@ function upgrade(item) {
               target="_blank"
               rel="noopener noreferrer"
               class="market-author"
-              title="项目仓库"
+              :title="t('extensions.market_repo_tooltip')"
             >
               · {{ repo_author(item) }}
             </a>
@@ -181,7 +202,11 @@ function upgrade(item) {
               target="_blank"
               rel="noopener noreferrer"
               class="market-homepage"
-              :title="item.homepage ? '项目主页' : '项目仓库'"
+              :title="
+                item.homepage
+                  ? t('extensions.market_homepage_tooltip')
+                  : t('extensions.market_repo_tooltip')
+              "
             >
               <Icon icon="lucide:github" width="15" />
             </a>
@@ -195,7 +220,7 @@ function upgrade(item) {
                 @click="upgrade(item)"
               >
                 <Icon icon="lucide:refresh-cw" width="13" />
-                升级
+                {{ t('extensions.market_upgrade') }}
               </Button>
               <Button
                 v-else-if="!item.installed"
@@ -205,11 +230,17 @@ function upgrade(item) {
                 @click="install(item)"
               >
                 <Icon icon="lucide:download" width="13" />
-                安装
+                {{ t('extensions.market_install') }}
               </Button>
-              <Button v-else variant="secondary" size="sm" disabled title="已是最新版本">
+              <Button
+                v-else
+                variant="secondary"
+                size="sm"
+                disabled
+                :title="t('extensions.market_up_to_date')"
+              >
                 <Icon icon="lucide:refresh-cw" width="13" />
-                升级
+                {{ t('extensions.market_upgrade') }}
               </Button>
             </template>
           </div>

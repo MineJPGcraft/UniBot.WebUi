@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
@@ -8,8 +9,11 @@ import { use_async_action } from '@/composables/use_async_action'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
+import { current_locale, set_locale, LOCALES } from '@/i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 const auth_store = useAuthStore()
 const toast = use_toast()
 const { run } = use_async_action()
@@ -19,7 +23,21 @@ const mode = ref(null)
 const submitting = ref(false)
 
 const login_form = ref({ username: '', password: '' })
-const setup_form = ref({ username: '', password: '', confirm_password: '', nickname: '管理员' })
+const setup_form = ref({
+  username: '',
+  password: '',
+  confirm_password: '',
+  nickname: t('login.login_default_nickname'),
+})
+
+function next_locale() {
+  const index = LOCALES.findIndex((item) => item.value === current_locale())
+  return LOCALES[(index + 1) % LOCALES.length].value
+}
+
+function toggle_locale() {
+  set_locale(next_locale())
+}
 
 onMounted(async () => {
   // 已有有效 token 则直接进入
@@ -44,16 +62,16 @@ onMounted(async () => {
 
 async function handle_login() {
   if (!login_form.value.username || !login_form.value.password) {
-    toast.error('请输入用户名和密码')
+    toast.error(t('login.login_error_required'))
     return
   }
   const ok = await run(
     () => auth_store.login(login_form.value.username, login_form.value.password),
-    '登录失败',
+    t('login.login_failed'),
     submitting,
   )
   if (ok) {
-    toast.success('登录成功')
+    toast.success(t('login.login_success'))
     router.push('/')
   }
 }
@@ -61,26 +79,26 @@ async function handle_login() {
 async function handle_setup() {
   const { username, password, confirm_password, nickname } = setup_form.value
   if (!username || !password) {
-    toast.error('请填写用户名和密码')
+    toast.error(t('login.login_setup_error_required'))
     return
   }
   if (password.length < 6) {
-    toast.error('密码至少 6 位')
+    toast.error(t('login.login_setup_error_password_short'))
     return
   }
   if (password !== confirm_password) {
-    toast.error('两次输入的密码不一致')
+    toast.error(t('login.login_setup_error_password_mismatch'))
     return
   }
   const ok = await run(
-    () => auth_store.setup(username, password, nickname || '管理员'),
-    '初始化失败',
+    () => auth_store.setup(username, password, nickname || t('login.login_default_nickname')),
+    t('login.login_setup_failed'),
     submitting,
   )
   // 无论成败都回到登录表单：失败时后端可能检测到已有账户（如并发创建）
   mode.value = 'login'
   if (ok) {
-    toast.success('初始化成功，请登录')
+    toast.success(t('login.login_setup_success'))
   }
 }
 </script>
@@ -88,43 +106,55 @@ async function handle_setup() {
 <template>
   <div class="login-page">
     <div class="login-panel">
+      <div class="locale-toggle">
+        <Tooltip :text="t('nav.switch_language')">
+          <button class="locale-button" type="button" @click="toggle_locale">
+            <Icon icon="lucide:languages" width="16" />
+          </button>
+        </Tooltip>
+      </div>
+
       <div class="login-brand">
         <div class="login-logo">
           <Icon icon="lucide:bot" width="26" />
         </div>
         <h1 class="login-title">UniBot</h1>
-        <p class="login-subtitle">Minecraft 群管机器人 · 控制面板</p>
+        <p class="login-subtitle">{{ t('login.login_subtitle') }}</p>
       </div>
 
       <!-- 探测中 -->
       <div v-if="mode === null" class="loading-block">
         <Spinner :size="16" />
-        正在连接服务…
+        {{ t('login.login_connecting') }}
       </div>
 
       <!-- 登录 -->
       <form v-else-if="mode === 'login'" class="login-form" @submit.prevent="handle_login">
         <div class="form-row">
-          <label class="form-label" for="login-username">用户名</label>
+          <label class="form-label" for="login-username">{{
+            t('login.login_username_label')
+          }}</label>
           <Input
             id="login-username"
             v-model="login_form.username"
-            placeholder="请输入用户名"
+            :placeholder="t('login.login_username_placeholder')"
             autocomplete="username"
           />
         </div>
         <div class="form-row">
-          <label class="form-label" for="login-password">密码</label>
+          <label class="form-label" for="login-password">{{
+            t('login.login_password_label')
+          }}</label>
           <Input
             id="login-password"
             v-model="login_form.password"
             type="password"
-            placeholder="请输入密码"
+            :placeholder="t('login.login_password_placeholder')"
             autocomplete="current-password"
           />
         </div>
         <Button variant="primary" type="submit" :loading="submitting" class="login-submit">
-          登 录
+          {{ t('login.login_submit') }}
         </Button>
       </form>
 
@@ -132,36 +162,52 @@ async function handle_setup() {
       <form v-else class="login-form" @submit.prevent="handle_setup">
         <div class="setup-notice">
           <Icon icon="lucide:sparkles" width="15" />
-          尚未创建任何账户，请先初始化管理员
+          {{ t('login.login_setup_notice') }}
         </div>
         <div class="form-row">
-          <label class="form-label" for="setup-username">用户名</label>
-          <Input id="setup-username" v-model="setup_form.username" placeholder="如 admin" />
+          <label class="form-label" for="setup-username">{{
+            t('login.login_username_label')
+          }}</label>
+          <Input
+            id="setup-username"
+            v-model="setup_form.username"
+            :placeholder="t('login.login_username_example')"
+          />
         </div>
         <div class="form-row">
-          <label class="form-label" for="setup-nickname">昵称</label>
-          <Input id="setup-nickname" v-model="setup_form.nickname" placeholder="管理员" />
+          <label class="form-label" for="setup-nickname">{{
+            t('login.login_nickname_label')
+          }}</label>
+          <Input
+            id="setup-nickname"
+            v-model="setup_form.nickname"
+            :placeholder="t('login.login_nickname_placeholder')"
+          />
         </div>
         <div class="form-row">
-          <label class="form-label" for="setup-password">密码</label>
+          <label class="form-label" for="setup-password">{{
+            t('login.login_password_label')
+          }}</label>
           <Input
             id="setup-password"
             v-model="setup_form.password"
             type="password"
-            placeholder="至少 6 位"
+            :placeholder="t('login.login_password_min_placeholder')"
           />
         </div>
         <div class="form-row">
-          <label class="form-label" for="setup-confirm">确认密码</label>
+          <label class="form-label" for="setup-confirm">{{
+            t('login.login_confirm_password_label')
+          }}</label>
           <Input
             id="setup-confirm"
             v-model="setup_form.confirm_password"
             type="password"
-            placeholder="再次输入密码"
+            :placeholder="t('login.login_confirm_password_placeholder')"
           />
         </div>
         <Button variant="primary" type="submit" :loading="submitting" class="login-submit">
-          创建管理员
+          {{ t('login.login_create_admin') }}
         </Button>
       </form>
     </div>
@@ -181,12 +227,39 @@ async function handle_setup() {
 }
 
 .login-panel {
+  position: relative;
   width: min(400px, 100%);
   padding: var(--space-8) var(--space-6);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
+}
+
+.locale-toggle {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.locale-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+
+.locale-button:hover {
+  background: rgb(0 0 0 / 0.04);
+  color: var(--text);
 }
 
 .login-brand {

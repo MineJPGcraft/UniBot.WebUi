@@ -16,12 +16,15 @@
  */
 
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import Input from './Input.vue'
 import Button from './Button.vue'
 import Switch from './Switch.vue'
 import Collapsible from './Collapsible.vue'
 import QrScanDialog from './QrScanDialog.vue'
+
+const { t } = useI18n()
 
 const props = defineProps({
   /** 后端提供的 form 结构 */
@@ -129,7 +132,14 @@ function array_item_title(item, index) {
     const title = String(item[placeholder] ?? '')
     if (title) return title
   }
-  return `${props.form.item_title || '项目'} ${index + 1}`
+  return `${props.form.item_title || t('ui.form_editor_item_fallback')} ${index + 1}`
+}
+
+/** 「添加 xx」按钮文案：优先使用后端 item_title */
+function add_item_label() {
+  return t('ui.form_editor_add_item', {
+    name: props.form.item_title || t('ui.form_editor_item_fallback'),
+  })
 }
 
 // ===== map 编辑 =====
@@ -216,6 +226,12 @@ function booleans_count(schema_index, field) {
   const entries = booleans_entries(schema_index, field)
   const opened = entries.filter(([, checked]) => checked).length
   return { opened, total: entries.length }
+}
+
+/** 布尔组「已开启 x/y」展示文案 */
+function booleans_enabled_text(schema_index, field) {
+  const { opened, total } = booleans_count(schema_index, field)
+  return t('ui.form_editor_booleans_enabled_count', { opened, total })
 }
 
 function map_field_entries(schema_index, field) {
@@ -360,7 +376,7 @@ function add_map_field_value_list(schema_index, field, index) {
             variant="ghost"
             size="sm"
             icon-only
-            title="扫码快速绑定"
+            :title="t('ui.form_editor_qr_bind_title')"
             @click="open_qr_scan(index)"
           >
             <Icon icon="lucide:qr-code" width="14" />
@@ -370,7 +386,7 @@ function add_map_field_value_list(schema_index, field, index) {
             size="sm"
             icon-only
             :disabled="index === 0"
-            title="上移"
+            :title="t('ui.form_editor_move_up')"
             @click="move_array_item(index, -1)"
           >
             <Icon icon="lucide:arrow-up" width="14" />
@@ -380,7 +396,7 @@ function add_map_field_value_list(schema_index, field, index) {
             size="sm"
             icon-only
             :disabled="index === array_items().length - 1"
-            title="下移"
+            :title="t('ui.form_editor_move_down')"
             @click="move_array_item(index, 1)"
           >
             <Icon icon="lucide:arrow-down" width="14" />
@@ -389,7 +405,7 @@ function add_map_field_value_list(schema_index, field, index) {
             variant="ghost"
             size="sm"
             icon-only
-            title="删除"
+            :title="t('common.delete')"
             @click="remove_array_item(index)"
           >
             <Icon icon="lucide:trash-2" width="14" />
@@ -413,7 +429,7 @@ function add_map_field_value_list(schema_index, field, index) {
               v-if="field.type === 'secret'"
               type="password"
               :model-value="field_value(item, field) ?? ''"
-              :placeholder="field.placeholder || '留空则不修改'"
+              :placeholder="field.placeholder || t('ui.form_editor_secret_placeholder')"
               @update:model-value="(v) => update_array_field(index, field.key, v)"
             />
             <!-- number -->
@@ -429,7 +445,13 @@ function add_map_field_value_list(schema_index, field, index) {
                 :model-value="Boolean(field_value(item, field))"
                 @update:model-value="(v) => update_array_field(index, field.key, v)"
               />
-              <span class="jfe-switch__text">{{ field_value(item, field) ? '开启' : '关闭' }}</span>
+              <span class="jfe-switch__text">
+                {{
+                  field_value(item, field)
+                    ? t('ui.form_editor_switch_on')
+                    : t('ui.form_editor_switch_off')
+                }}
+              </span>
             </label>
             <!-- object: booleans -->
             <Collapsible
@@ -440,9 +462,7 @@ function add_map_field_value_list(schema_index, field, index) {
               <template #trigger>
                 <span class="jfe-collapse__title">{{ field.label }}</span>
                 <span class="jfe-collapse__count">
-                  已开启 {{ booleans_count(index, field).opened }}/{{
-                    booleans_count(index, field).total
-                  }}
+                  {{ booleans_enabled_text(index, field) }}
                 </span>
               </template>
               <template #content>
@@ -506,7 +526,7 @@ function add_map_field_value_list(schema_index, field, index) {
                     @click="add_map_field_value_list(index, field, eindex)"
                   >
                     <Icon icon="lucide:plus" width="13" />
-                    添加地址
+                    {{ t('ui.form_editor_add_address') }}
                   </Button>
                 </div>
                 <Input
@@ -527,7 +547,7 @@ function add_map_field_value_list(schema_index, field, index) {
               </div>
               <Button variant="secondary" size="sm" @click="add_map_field_entry(index, field)">
                 <Icon icon="lucide:plus" width="13" />
-                添加条目
+                {{ t('ui.form_editor_add_entry') }}
               </Button>
             </div>
             <!-- 占位：未支持的字段类型 -->
@@ -556,7 +576,7 @@ function add_map_field_value_list(schema_index, field, index) {
       @click="add_array_item"
     >
       <Icon icon="lucide:plus" width="13" />
-      添加{{ form.item_title || '项目' }}
+      {{ add_item_label() }}
     </Button>
   </div>
 
@@ -592,7 +612,7 @@ function add_map_field_value_list(schema_index, field, index) {
         </div>
         <Button variant="secondary" size="sm" @click="add_map_value_list_item(index)">
           <Icon icon="lucide:plus" width="13" />
-          添加地址
+          {{ t('ui.form_editor_add_address') }}
         </Button>
       </div>
       <Input
@@ -614,7 +634,7 @@ function add_map_field_value_list(schema_index, field, index) {
       @click="add_map_entry"
     >
       <Icon icon="lucide:plus" width="13" />
-      添加条目
+      {{ t('ui.form_editor_add_entry') }}
     </Button>
   </div>
 </template>

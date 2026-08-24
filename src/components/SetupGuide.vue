@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
@@ -14,6 +15,7 @@ import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import McConnectDialog from '@/components/McConnectDialog.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const config_store = useConfigStore()
 const adapter_store = useAdapterStore()
@@ -40,7 +42,7 @@ async function open_token_dialog() {
   try {
     token_value.value = await status_store.fetch_token()
   } catch (error) {
-    toast.error(error.message || '获取认证令牌失败')
+    toast.error(error.message || t('setup.setup_fetch_token_failed'))
   } finally {
     token_loading.value = false
   }
@@ -50,9 +52,9 @@ async function copy_token() {
   if (!token_value.value) return
   try {
     await navigator.clipboard.writeText(token_value.value)
-    toast.success('认证令牌已复制')
+    toast.success(t('setup.setup_token_copied'))
   } catch {
-    toast.error('复制失败，请手动选择复制')
+    toast.error(t('common.copy_failed'))
   }
 }
 
@@ -93,28 +95,28 @@ const superuser_ready = computed(() => {
 const steps = computed(() => [
   {
     key: 'chat',
-    title: '连接聊天平台',
-    description: '安装并启用 QQ / Telegram 等平台适配器',
+    title_key: 'setup.setup_step_chat_title',
+    description_key: 'setup.setup_step_chat_description',
     icon: 'lucide:message-circle',
     done: chat_ready.value,
     target: { path: '/adapters' },
   },
   {
     key: 'server',
-    title: '接入 Minecraft 服务器',
-    description: '安装鹊桥插件接入服务器，双方任一方主动连接均可',
+    title_key: 'setup.setup_step_server_title',
+    description_key: 'setup.setup_step_server_description',
     icon: 'lucide:server',
-    action_label: '生成配置',
+    action_label_key: 'setup.setup_step_server_action',
     done: server_ready.value,
   },
   {
     key: 'superuser',
-    title: '添加超级用户',
-    description: '设置管理员，获得管理命令权限',
+    title_key: 'setup.setup_step_superuser_title',
+    description_key: 'setup.setup_step_superuser_description',
     icon: 'lucide:shield',
-    action_label: '令牌授权',
+    action_label_key: 'setup.setup_step_superuser_action',
     done: superuser_ready.value,
-    target: { name: 'ConfigView', query: { tab: 'env', group: '框架' } },
+    target: { name: 'ConfigView', query: { tab: 'env', group: 'framework' } },
   },
 ])
 
@@ -154,8 +156,8 @@ onMounted(async () => {
         <div class="setup-title">
           <span class="setup-icon"><Icon icon="lucide:rocket" width="16" /></span>
           <div>
-            <h3 class="card-title">快速开始</h3>
-            <p class="setup-desc">完成以下步骤即可让机器人跑起来</p>
+            <h3 class="card-title">{{ t('setup.setup_title') }}</h3>
+            <p class="setup-desc">{{ t('setup.setup_desc') }}</p>
           </div>
         </div>
         <div class="setup-actions">
@@ -166,7 +168,7 @@ onMounted(async () => {
           <button
             class="setup-collapse"
             type="button"
-            :title="collapsed ? '展开引导' : '收起引导'"
+            :title="collapsed ? t('setup.setup_expand') : t('setup.setup_collapse')"
             @click="toggle_collapsed"
           >
             <Icon :icon="collapsed ? 'lucide:chevron-down' : 'lucide:chevron-up'" width="16" />
@@ -187,11 +189,17 @@ onMounted(async () => {
             <Icon v-else :icon="step.icon" width="15" />
           </span>
           <div class="setup-step-body">
-            <span class="setup-step-title">{{ step.title }}</span>
-            <span class="setup-step-desc">{{ step.description }}</span>
+            <span class="setup-step-title">{{ t(step.title_key) }}</span>
+            <span class="setup-step-desc">{{ t(step.description_key) }}</span>
           </div>
           <Badge :variant="step.done ? 'success' : 'neutral'">
-            {{ step.done ? '已完成' : step.action_label || '去配置' }}
+            {{
+              step.done
+                ? t('setup.setup_step_done')
+                : step.action_label_key
+                  ? t(step.action_label_key)
+                  : t('setup.setup_step_go_config')
+            }}
           </Badge>
           <Icon icon="lucide:chevron-right" width="14" class="setup-arrow" />
         </li>
@@ -200,31 +208,36 @@ onMounted(async () => {
 
     <Dialog
       v-model="token_dialog_open"
-      title="令牌快速授权"
-      description="在任意平台的群聊中发送下方认证令牌，即可自动完成初始化：本群加入消息群与指令群，发送者成为超级用户。"
+      :title="t('setup.setup_token_dialog_title')"
+      :description="t('setup.setup_token_dialog_description')"
       :hide-footer="true"
       width="min(520px, calc(100vw - 32px))"
     >
       <div class="token-guide">
         <ol class="token-steps">
-          <li>复制下方认证令牌；</li>
-          <li>在需要授权的平台群聊中发送该令牌；</li>
-          <li>机器人自动把本群加入消息群 / 指令群，并把发送者设为超级用户。</li>
+          <li>{{ t('setup.setup_token_step_copy') }}</li>
+          <li>{{ t('setup.setup_token_step_send') }}</li>
+          <li>{{ t('setup.setup_token_step_auto') }}</li>
         </ol>
 
         <div class="token-box">
-          <div v-if="token_loading" class="token-loading"><Spinner :size="16" /> 获取令牌中…</div>
+          <div v-if="token_loading" class="token-loading">
+            <Spinner :size="16" />
+            {{ t('setup.setup_token_loading') }}
+          </div>
           <template v-else>
-            <code class="token-value mono">{{ token_value || '暂未生成令牌' }}</code>
+            <code class="token-value mono">{{
+              token_value || t('setup.setup_token_missing')
+            }}</code>
             <Button variant="secondary" size="sm" :disabled="!token_value" @click="copy_token">
               <Icon icon="lucide:copy" width="14" />
-              复制
+              {{ t('common.copy') }}
             </Button>
           </template>
         </div>
 
         <p class="token-tip">
-          令牌即用即刷：使用一次后立即刷新，旧令牌自动作废；机器人启动时也会在控制台打印。
+          {{ t('setup.setup_token_tip') }}
         </p>
       </div>
     </Dialog>

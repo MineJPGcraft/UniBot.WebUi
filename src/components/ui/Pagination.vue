@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import {
   PaginationRoot,
@@ -13,6 +14,8 @@ import {
 } from 'reka-ui'
 import Button from './Button.vue'
 import Input from './Input.vue'
+
+const { t } = useI18n()
 
 const props = defineProps({
   page: { type: Number, required: true },
@@ -48,10 +51,10 @@ function jump() {
       @update:page="on_page_change"
     >
       <PaginationList v-slot="{ items }" class="ui-pagination-list">
-        <PaginationFirst class="ui-pagination-btn" title="首页">
+        <PaginationFirst class="ui-pagination-btn" :title="t('common.page_first')">
           <Icon icon="lucide:chevrons-left" width="14" />
         </PaginationFirst>
-        <PaginationPrev class="ui-pagination-btn" title="上一页">
+        <PaginationPrev class="ui-pagination-btn" :title="t('common.page_prev')">
           <Icon icon="lucide:chevron-left" width="14" />
         </PaginationPrev>
 
@@ -74,10 +77,10 @@ function jump() {
           </PaginationEllipsis>
         </template>
 
-        <PaginationNext class="ui-pagination-btn" title="下一页">
+        <PaginationNext class="ui-pagination-btn" :title="t('common.page_next')">
           <Icon icon="lucide:chevron-right" width="14" />
         </PaginationNext>
-        <PaginationLast class="ui-pagination-btn" title="末页">
+        <PaginationLast class="ui-pagination-btn" :title="t('common.page_last')">
           <Icon icon="lucide:chevrons-right" width="14" />
         </PaginationLast>
       </PaginationList>
@@ -89,11 +92,11 @@ function jump() {
         type="number"
         min="1"
         :max="total_pages"
-        placeholder="页码"
+        :placeholder="t('common.page_number')"
         class="ui-pagination-input"
         @keydown.enter="jump"
       />
-      <Button variant="secondary" size="sm" @click="jump">跳转</Button>
+      <Button variant="secondary" size="sm" @click="jump">{{ t('common.page_jump') }}</Button>
     </div>
   </div>
 </template>

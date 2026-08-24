@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Button from '@/components/ui/Button.vue'
@@ -9,6 +10,7 @@ import { useStatusStore } from '@/stores/status'
 import { use_toast } from '@/composables/use_toast'
 import { use_async_action } from '@/composables/use_async_action'
 
+const { t } = useI18n()
 const auth_store = useAuthStore()
 const status_store = useStatusStore()
 const toast = use_toast()
@@ -44,32 +46,41 @@ function view_details() {
 }
 
 async function update_bot() {
-  const ok = await run(() => status_store.update_bot(), '更新失败', updating)
+  const ok = await run(() => status_store.update_bot(), t('layout.update_failed'), updating)
   if (!ok) return
   toggle_dialog(false)
-  toast.success('更新成功，机器人正在重启')
+  toast.success(t('layout.update_success_toast'))
 }
 </script>
 
 <template>
   <Dialog
     :model-value="dialog_open"
-    title="发现新版本"
-    :description="`当前版本 ${status?.version || '—'}，最新版本 ${status?.latest_version || '—'}`"
+    :title="t('layout.update_dialog_title')"
+    :description="
+      t('layout.update_version_info', {
+        current: status?.version || '—',
+        latest: status?.latest_version || '—',
+      })
+    "
     hide-footer
     width="min(420px, calc(100vw - 32px))"
     @update:model-value="toggle_dialog"
   >
     <p class="update-hint">
       <Icon icon="lucide:arrow-up-circle" width="15" />
-      检测到新版本，建议及时更新以获取最新功能与修复。
+      {{ t('layout.update_hint') }}
     </p>
     <div class="update-actions">
-      <Button variant="ghost" @click="toggle_dialog(false)">稍后再说</Button>
-      <Button variant="secondary" @click="view_details">查看详情</Button>
+      <Button variant="ghost" @click="toggle_dialog(false)">
+        {{ t('layout.update_later') }}
+      </Button>
+      <Button variant="secondary" @click="view_details">
+        {{ t('layout.update_view_details') }}
+      </Button>
       <Button v-if="auth_store.is_admin" variant="primary" :loading="updating" @click="update_bot">
         <Icon icon="lucide:download" width="15" />
-        立即更新
+        {{ t('layout.update_now') }}
       </Button>
     </div>
   </Dialog>

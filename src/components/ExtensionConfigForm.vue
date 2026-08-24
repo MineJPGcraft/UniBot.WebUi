@@ -7,6 +7,7 @@
  *    经 ref 调用（Dialog 确认按钮场景）。
  */
 import { reactive, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
@@ -24,6 +25,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['save'])
+
+const { t } = useI18n()
 
 const draft = reactive({})
 
@@ -126,9 +129,11 @@ defineExpose({ confirm_save })
 </script>
 
 <template>
-  <div v-if="loading" class="loading-block"><Spinner :size="16" /> 加载配置中…</div>
+  <div v-if="loading" class="loading-block">
+    <Spinner :size="16" /> {{ t('extensions.form_loading') }}
+  </div>
   <div v-else-if="!schema || !Object.keys(schema.properties || {}).length" class="config-empty">
-    该扩展未声明配置项
+    {{ t('extensions.form_empty') }}
   </div>
   <div v-else class="config-form">
     <div v-for="(property, key) in schema.properties || {}" :key="key" class="config-row">
@@ -159,7 +164,11 @@ defineExpose({ confirm_save })
             :disabled="disabled"
             @input="draft[key] = $event.target.value"
           />
-          <Input v-model="draft[key]" placeholder="#RRGGBB 或 #RRGGBBAA" :disabled="disabled" />
+          <Input
+            v-model="draft[key]"
+            :placeholder="t('extensions.form_color_placeholder')"
+            :disabled="disabled"
+          />
         </div>
         <Input
           v-else-if="field_type(property) === 'number'"
@@ -174,7 +183,7 @@ defineExpose({ confirm_save })
           v-else-if="is_secret(key)"
           v-model="draft[key]"
           type="password"
-          placeholder="留空则不修改"
+          :placeholder="t('extensions.form_secret_placeholder')"
           :disabled="disabled"
         />
         <Input
@@ -188,12 +197,12 @@ defineExpose({ confirm_save })
           v-model="draft[key]"
           :disabled="disabled"
         />
-        <div v-else class="config-unsupported">暂不支持该类型</div>
+        <div v-else class="config-unsupported">{{ t('extensions.form_unsupported_type') }}</div>
       </div>
     </div>
     <div v-if="showActions" class="config-actions">
       <Button size="sm" :loading="saving" :disabled="disabled" @click="confirm_save">
-        保存配置
+        {{ t('extensions.form_save') }}
       </Button>
     </div>
   </div>

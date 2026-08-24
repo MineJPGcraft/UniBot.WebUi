@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useStatusStore } from '@/stores/status'
 import { useServerStore } from '@/stores/server'
@@ -16,6 +17,7 @@ import { ansi_to_html } from '@/utils/ansi'
 import { server_type_icon, server_type_label } from '@/utils/server'
 
 const router = useRouter()
+const { t } = useI18n()
 const status_store = useStatusStore()
 const server_store = useServerStore()
 const log_store = useLogStore()
@@ -35,10 +37,26 @@ const memory_percent = computed(() => {
 const online_count = computed(() => server_list.value.filter((server) => server.online).length)
 
 const stat_items = computed(() => [
-  { label: '版本', value: status.value?.version || '—', icon: 'lucide:tag' },
-  { label: '运行时长', value: format_uptime(status.value?.uptime), icon: 'lucide:timer' },
-  { label: '已绑定玩家', value: status.value?.players_bound ?? '—', icon: 'lucide:users' },
-  { label: 'WS 客户端', value: status.value?.ws_clients ?? '—', icon: 'lucide:radio' },
+  {
+    label: t('dashboard.dashboard_stat_version'),
+    value: status.value?.version || '—',
+    icon: 'lucide:tag',
+  },
+  {
+    label: t('dashboard.dashboard_stat_uptime'),
+    value: format_uptime(status.value?.uptime),
+    icon: 'lucide:timer',
+  },
+  {
+    label: t('dashboard.dashboard_stat_players_bound'),
+    value: status.value?.players_bound ?? '—',
+    icon: 'lucide:users',
+  },
+  {
+    label: t('dashboard.dashboard_stat_ws_clients'),
+    value: status.value?.ws_clients ?? '—',
+    icon: 'lucide:radio',
+  },
 ])
 
 onMounted(async () => {
@@ -52,12 +70,16 @@ onMounted(async () => {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">仪表盘</h1>
-        <p class="page-desc">机器人运行状态总览</p>
+        <h1 class="page-title">{{ t('nav.dashboard') }}</h1>
+        <p class="page-desc">{{ t('dashboard.dashboard_page_desc') }}</p>
       </div>
       <Badge :variant="connection_state === 'connected' ? 'success' : 'danger'">
         <span class="pulse-dot" :class="{ 'pulse-dot--on': connection_state === 'connected' }" />
-        {{ connection_state === 'connected' ? '实时推送已连接' : '实时推送未连接' }}
+        {{
+          connection_state === 'connected'
+            ? t('dashboard.dashboard_ws_connected')
+            : t('dashboard.dashboard_ws_disconnected')
+        }}
       </Badge>
     </div>
 
@@ -75,7 +97,7 @@ onMounted(async () => {
         <div class="stat-body stat-body--wide">
           <span class="stat-value">{{ format_mb(status?.memory_mb) }}</span>
           <Progress :value="memory_percent" />
-          <span class="stat-label">内存占用</span>
+          <span class="stat-label">{{ t('dashboard.dashboard_stat_memory') }}</span>
         </div>
       </div>
       <div class="stat-cell">
@@ -83,7 +105,7 @@ onMounted(async () => {
         <div class="stat-body stat-body--wide">
           <span class="stat-value">{{ status?.cpu_percent ?? '—' }}%</span>
           <Progress :value="status?.cpu_percent || 0" />
-          <span class="stat-label">CPU 占用</span>
+          <span class="stat-label">{{ t('dashboard.dashboard_stat_cpu') }}</span>
         </div>
       </div>
     </section>
@@ -95,15 +117,22 @@ onMounted(async () => {
       <!-- 服务器一览 -->
       <section class="card">
         <div class="card-header">
-          <h3 class="card-title">服务器一览</h3>
-          <Badge variant="accent">{{ online_count }} / {{ server_list.length }} 在线</Badge>
+          <h3 class="card-title">{{ t('dashboard.dashboard_server_title') }}</h3>
+          <Badge variant="accent">
+            {{
+              t('dashboard.dashboard_server_online_count', {
+                online: online_count,
+                total: server_list.length,
+              })
+            }}
+          </Badge>
         </div>
         <div class="card-body server-panel">
           <EmptyState
             v-if="server_list.length === 0"
             icon="lucide:server-off"
-            title="暂无服务器"
-            description="尚未有 Minecraft 服务器连接到机器人"
+            :title="t('dashboard.dashboard_server_empty_title')"
+            :description="t('dashboard.dashboard_server_empty_description')"
           />
           <ul v-else class="server-rows">
             <li
@@ -128,7 +157,7 @@ onMounted(async () => {
               </div>
               <div class="server-meta">
                 <Badge :variant="server.online ? 'success' : 'neutral'">
-                  {{ server.online ? '在线' : '离线' }}
+                  {{ server.online ? t('common.online') : t('common.offline') }}
                 </Badge>
                 <span class="server-players">
                   <Icon icon="lucide:users" width="13" />
@@ -144,13 +173,16 @@ onMounted(async () => {
       <!-- 实时日志 -->
       <section class="card">
         <div class="card-header">
-          <h3 class="card-title">实时日志</h3>
+          <h3 class="card-title">{{ t('dashboard.dashboard_logs_title') }}</h3>
           <RouterLink to="/logs" class="more-link">
-            查看全部 <Icon icon="lucide:arrow-right" width="13" />
+            {{ t('dashboard.dashboard_logs_view_all') }}
+            <Icon icon="lucide:arrow-right" width="13" />
           </RouterLink>
         </div>
         <div class="log-stream">
-          <div v-if="live_logs.length === 0" class="log-placeholder">等待日志推送…</div>
+          <div v-if="live_logs.length === 0" class="log-placeholder">
+            {{ t('dashboard.dashboard_logs_waiting') }}
+          </div>
           <div
             v-for="(log, index) in display_logs"
             :key="log.seq || `${log.time}-${index}`"
@@ -176,14 +208,16 @@ onMounted(async () => {
     <!-- 适配器 -->
     <section class="card adapter-card">
       <div class="card-header">
-        <h3 class="card-title">已加载适配器</h3>
+        <h3 class="card-title">{{ t('dashboard.dashboard_adapters_title') }}</h3>
       </div>
       <div class="card-body adapter-list">
         <Badge v-for="adapter in status?.adapters || []" :key="adapter" variant="neutral">
           <Icon icon="lucide:plug" width="12" />
           {{ adapter }}
         </Badge>
-        <span v-if="!status?.adapters?.length" class="text-muted text-sm">暂无适配器</span>
+        <span v-if="!status?.adapters?.length" class="text-muted text-sm">
+          {{ t('dashboard.dashboard_adapters_empty') }}
+        </span>
       </div>
     </section>
   </div>

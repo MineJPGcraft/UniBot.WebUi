@@ -9,6 +9,7 @@
  *   await run(() => store.save(), '保存失败', saving)
  */
 import { ref } from 'vue'
+import { t_global } from '@/i18n'
 import { use_toast } from '@/composables/use_toast'
 
 export function use_async_action() {
@@ -22,7 +23,11 @@ export function use_async_action() {
    * @param {{ value: boolean }} [busy_ref] 外部 busy 标志（缺省用内部 busy）
    * @returns {Promise<boolean>} 动作是否成功
    */
-  async function run(action, failure_message = '操作失败', busy_ref = busy) {
+  async function run(
+    action,
+    failure_message = t_global('common.operation_failed'),
+    busy_ref = busy,
+  ) {
     busy_ref.value = true
     try {
       await action()

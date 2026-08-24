@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
@@ -12,6 +13,7 @@ import CodePanel from '@/components/ui/CodePanel.vue'
 
 const open = defineModel({ type: Boolean, default: false })
 
+const { t } = useI18n()
 const config_store = useConfigStore()
 const { env_values } = storeToRefs(config_store)
 const { run, busy } = use_async_action()
@@ -32,7 +34,9 @@ const active_tab = ref('mc_to_bot')
 const write_done = ref(false)
 
 /** 配置中展示的服务器名称，未填写时用占位符提醒 */
-const display_name = computed(() => server_name.value.trim() || '<服务器名称>')
+const display_name = computed(
+  () => server_name.value.trim() || t('servers.mc_connect_name_fallback'),
+)
 
 /** 配置中展示的鉴权令牌 */
 const display_token = computed(() => access_token.value.trim())
@@ -65,7 +69,7 @@ function core_env_fields() {
 async function write_core_config() {
   const ok = await run(
     () => config_store.save_env_fields(core_env_fields()),
-    '写入核心配置失败',
+    t('servers.mc_connect_write_failed'),
     busy,
   )
   if (ok) write_done.value = true
@@ -78,7 +82,7 @@ watch([server_name, access_token, mc_ws_url, active_tab], () => {
 
 /** MC 服务器侧鹊桥配置（可直接复制） */
 const server_block = computed(() => ({
-  title: 'MC 服务器侧 · 鹊桥（config.yml）',
+  title: t('servers.mc_connect_server_block_title'),
   language: 'yaml',
   code:
     active_tab.value === 'mc_to_bot'
@@ -86,7 +90,7 @@ const server_block = computed(() => ({
           `server_name: "${display_name.value}"`,
           `access_token: "${display_token.value}"`,
           '',
-          '# 反向 WebSocket：MC 服务器主动连接核心',
+          t('servers.mc_connect_code_comment_reverse'),
           'websocket_client:',
           '  enable: true',
           '  reconnect_interval: 5',
@@ -101,7 +105,7 @@ const server_block = computed(() => ({
           `server_name: "${display_name.value}"`,
           `access_token: "${display_token.value}"`,
           '',
-          '# 正向 WebSocket：MC 服务器开放监听端口，等待核心接入',
+          t('servers.mc_connect_code_comment_forward'),
           'websocket_server:',
           '  enable: true',
           '  host: "0.0.0.0"',
@@ -116,8 +120,8 @@ const server_block = computed(() => ({
 <template>
   <Dialog
     v-model="open"
-    title="接入 Minecraft 服务器"
-    description="选择连接方式后，核心侧一键写入，MC 侧复制到鹊桥配置文件即可。"
+    :title="t('servers.mc_connect_dialog_title')"
+    :description="t('servers.mc_connect_dialog_description')"
     :hide-footer="true"
     width="min(640px, calc(100vw - 32px))"
   >
@@ -125,23 +129,33 @@ const server_block = computed(() => ({
       <!-- 基础信息 -->
       <div class="basic-fields">
         <div class="field">
-          <label class="field-label" for="mc-connect-server-name">服务器名称</label>
-          <Input id="mc-connect-server-name" v-model="server_name" placeholder="例如 survival" />
+          <label class="field-label" for="mc-connect-server-name">{{
+            t('servers.mc_connect_server_name_label')
+          }}</label>
+          <Input
+            id="mc-connect-server-name"
+            v-model="server_name"
+            :placeholder="t('servers.mc_connect_server_name_placeholder')"
+          />
         </div>
         <div class="field">
-          <label class="field-label" for="mc-connect-access-token">鉴权令牌</label>
+          <label class="field-label" for="mc-connect-access-token">{{
+            t('servers.mc_connect_token_label')
+          }}</label>
           <Input
             id="mc-connect-access-token"
             v-model="access_token"
-            placeholder="选填，留空则不校验"
+            :placeholder="t('servers.mc_connect_token_placeholder')"
           />
         </div>
         <div v-if="active_tab === 'bot_to_mc'" class="field field--full">
-          <label class="field-label" for="mc-connect-server-url">MC 服务器地址</label>
+          <label class="field-label" for="mc-connect-server-url">{{
+            t('servers.mc_connect_url_label')
+          }}</label>
           <Input
             id="mc-connect-server-url"
             v-model="mc_ws_url"
-            placeholder="ws://<MC服务器IP>:8080/mc"
+            :placeholder="t('servers.mc_connect_url_placeholder')"
           />
         </div>
       </div>
@@ -157,12 +171,11 @@ const server_block = computed(() => ({
         <template #[active_tab]>
           <p v-if="active_tab === 'mc_to_bot'" class="mode-note mode-note--recommend">
             <Icon icon="lucide:thumbs-up" width="13" />
-            推荐：MC 服务器主动连接核心，MC 侧无需开放端口；核心地址已按当前访问地址自动生成。
+            {{ t('servers.mc_connect_mode_recommend_note') }}
           </p>
           <p v-else class="mode-note">
             <Icon icon="lucide:info" width="13" />
-            核心主动连接 MC 服务器，需要 MC 侧开放监听端口，地址填 MC 服务器可被访问的 WebSocket
-            地址。
+            {{ t('servers.mc_connect_mode_forward_note') }}
           </p>
 
           <!-- 核心侧：一键写入 -->
@@ -170,18 +183,18 @@ const server_block = computed(() => ({
             <div class="core-card-head">
               <span class="core-card-title">
                 <Icon icon="lucide:server" width="14" />
-                核心侧 · UniBot
+                {{ t('servers.mc_connect_core_side_title') }}
               </span>
               <span v-if="write_done" class="core-card-done">
                 <Icon icon="lucide:circle-check" width="14" />
-                已写入，重启机器人后生效
+                {{ t('servers.mc_connect_written_hint') }}
               </span>
             </div>
             <p class="core-card-desc">
               {{
                 active_tab === 'mc_to_bot'
-                  ? '将把鉴权令牌写入 .env（MINECRAFT_ACCESS_TOKEN），WS 地址保持为空。'
-                  : '将把该服务器的地址与令牌写入 .env（MINECRAFT_WS_URLS / MINECRAFT_ACCESS_TOKEN），已有其他服务器不受影响。'
+                  ? t('servers.mc_connect_core_desc_reverse')
+                  : t('servers.mc_connect_core_desc_forward')
               }}
             </p>
             <Button
@@ -192,7 +205,9 @@ const server_block = computed(() => ({
               @click="write_core_config"
             >
               <Icon :icon="write_done ? 'lucide:check' : 'lucide:pen-line'" width="14" />
-              {{ write_done ? '已写入' : '写入核心配置' }}
+              {{
+                write_done ? t('servers.mc_connect_written') : t('servers.mc_connect_write_action')
+              }}
             </Button>
           </div>
 
@@ -207,9 +222,13 @@ const server_block = computed(() => ({
       </Tabs>
 
       <p class="config-tip">
-        鹊桥插件端配置位于 <code class="mono">./plugins/QueQiao/config.yml</code>， 模组端位于
-        <code class="mono">./config/QueQiao/config.yml</code>； 两端的
-        <code class="mono">server_name</code> 与令牌必须一致。
+        {{ t('servers.mc_connect_tip_plugin_config') }}
+        <code class="mono">./plugins/QueQiao/config.yml</code
+        >{{ t('servers.mc_connect_tip_mod_config') }}
+        <code class="mono">./config/QueQiao/config.yml</code
+        >{{ t('servers.mc_connect_tip_both_prefix') }}
+        <code class="mono">server_name</code>
+        {{ t('servers.mc_connect_tip_must_match') }}
       </p>
 
       <!-- 文档引导 -->
@@ -223,8 +242,8 @@ const server_block = computed(() => ({
           <Icon icon="lucide:book-open" width="16" />
         </span>
         <span class="docs-entry-body">
-          <span class="docs-entry-title">查看完整接入文档</span>
-          <span class="docs-entry-desc">MCDR 插件接入、Header 鉴权、基岩版支持等</span>
+          <span class="docs-entry-title">{{ t('servers.mc_connect_docs_entry_title') }}</span>
+          <span class="docs-entry-desc">{{ t('servers.mc_connect_docs_entry_description') }}</span>
         </span>
         <Icon icon="lucide:chevron-right" width="16" class="docs-entry-arrow" />
       </a>

@@ -1,6 +1,7 @@
 /**
  * 纯函数工具：格式化时间、时长、字节数等
  */
+import { t_global } from '@/i18n'
 
 /** 秒数 → 可读运行时长，如 1天 3小时 12分钟 */
 export function format_uptime(seconds) {
@@ -9,9 +10,9 @@ export function format_uptime(seconds) {
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const parts = []
-  if (days > 0) parts.push(`${days} 天`)
-  if (hours > 0) parts.push(`${hours} 小时`)
-  parts.push(`${minutes} 分钟`)
+  if (days > 0) parts.push(t_global('users.duration_days', { count: days }))
+  if (hours > 0) parts.push(t_global('users.duration_hours', { count: hours }))
+  parts.push(t_global('users.duration_minutes', { count: minutes }))
   return parts.join(' ')
 }
 
@@ -52,8 +53,12 @@ export function format_datetime(iso_string) {
 
 /** 角色标识 → 中文显示名 */
 export function role_label(role) {
-  const labels = { admin: '管理员', operator: '操作员', viewer: '观察者' }
-  return labels[role] || role
+  const label_keys = {
+    admin: 'users.role_admin',
+    operator: 'users.role_operator',
+    viewer: 'users.role_viewer',
+  }
+  return label_keys[role] ? t_global(label_keys[role]) : role
 }
 
 /** 日志级别 → 显示色类名 */

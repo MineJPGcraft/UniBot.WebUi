@@ -1,5 +1,6 @@
 <script setup>
-import { useId } from 'vue'
+import { computed, useId } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   DialogRoot,
   DialogTrigger,
@@ -12,15 +13,17 @@ import {
 } from 'reka-ui'
 import Button from './Button.vue'
 
+const { t } = useI18n()
+
 const open = defineModel({ type: Boolean, default: false })
 
 const description_id = useId()
 
-defineProps({
+const props = defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  confirmText: { type: String, default: '确认' },
-  cancelText: { type: String, default: '取消' },
+  confirmText: { type: String, default: '' },
+  cancelText: { type: String, default: '' },
   confirmVariant: { type: String, default: 'primary' },
   loading: { type: Boolean, default: false },
   hideFooter: { type: Boolean, default: false },
@@ -28,6 +31,9 @@ defineProps({
 })
 
 defineEmits(['confirm'])
+
+const confirm_text = computed(() => props.confirmText || t('common.confirm'))
+const cancel_text = computed(() => props.cancelText || t('common.cancel'))
 </script>
 
 <template>
@@ -51,10 +57,10 @@ defineEmits(['confirm'])
         </div>
         <div v-if="!hideFooter" class="ui-dialog-footer">
           <DialogClose as-child>
-            <Button variant="ghost">{{ cancelText }}</Button>
+            <Button variant="ghost">{{ cancel_text }}</Button>
           </DialogClose>
           <Button :variant="confirmVariant" :loading="loading" @click="$emit('confirm')">
-            {{ confirmText }}
+            {{ confirm_text }}
           </Button>
         </div>
       </DialogContent>

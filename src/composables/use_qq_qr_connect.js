@@ -9,6 +9,7 @@
  * 认证通过 HttpOnly cookie 自动携带，无需手动传 token。
  */
 import { ref } from 'vue'
+import { t_global } from '@/i18n'
 import { api_url } from '@/utils/http'
 
 /** 登录状态枚举（与后端 QrLoginState 对应） */
@@ -103,13 +104,16 @@ export function use_qq_qr_connect() {
         if (!first_settled) {
           first_settled = true
           creating.value = false
-          reject(new Error('扫码连接失败'))
+          reject(new Error(t_global('ui.qq_connect_stream_failed')))
           close_source()
           return
         }
         // 流建立后断开：EventSource 默认会自动重连并重新发起新的登录流程，
         // 这里主动关闭并以失败终态收尾，避免等待 Promise 永久挂起
-        handle_terminal({ state: QR_LOGIN_STATE.FAILED, error: '扫码连接中断' })
+        handle_terminal({
+          state: QR_LOGIN_STATE.FAILED,
+          error: t_global('ui.qq_connect_stream_interrupted'),
+        })
       }
 
       event_source = source
@@ -132,7 +136,10 @@ export function use_qq_qr_connect() {
       terminal_settle = { resolve }
       // 超时保护：SSE 静默或用户长时间未扫码时结束等待
       timeout_timer = setTimeout(() => {
-        settle_terminal({ state: QR_LOGIN_STATE.FAILED, error: '等待超时，请重新生成二维码' })
+        settle_terminal({
+          state: QR_LOGIN_STATE.FAILED,
+          error: t_global('ui.qq_connect_wait_timeout'),
+        })
       }, LOGIN_TIMEOUT_MS)
     })
   }
@@ -142,7 +149,7 @@ export function use_qq_qr_connect() {
    */
   function cancel_login() {
     close_source()
-    settle_terminal({ state: QR_LOGIN_STATE.CANCELLED, error: '用户取消' })
+    settle_terminal({ state: QR_LOGIN_STATE.CANCELLED, error: t_global('ui.qq_connect_cancelled') })
   }
 
   return {

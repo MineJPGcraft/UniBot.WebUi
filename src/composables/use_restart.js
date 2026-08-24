@@ -4,6 +4,7 @@
  * 模块级共享状态，任意组件通过 use_restart() 触发。
  */
 import { ref } from 'vue'
+import { t_global } from '@/i18n'
 import { use_toast } from '@/composables/use_toast'
 import { http } from '@/utils/http'
 
@@ -43,7 +44,7 @@ async function wait_for_restart(previous_started_at) {
     }
   }
   restarting.value = false
-  toast.error('机器人重启超时，请稍后刷新页面')
+  toast.error(t_global('ui.restart_timeout'))
 }
 
 async function restart_bot() {
@@ -53,19 +54,19 @@ async function restart_bot() {
   try {
     const previous_instance = await http.post('/api/status/restart', {})
     prompt_open.value = false
-    toast.success('机器人正在重启')
+    toast.success(t_global('ui.restart_started'))
     await wait_for_restart(previous_instance.started_at)
   } catch (error) {
     restarting.value = false
-    toast.error(error.message || '重启失败')
+    toast.error(error.message || t_global('ui.restart_failed'))
   }
 }
 
 export function use_restart() {
   /** 弹出「是否立即重启」询问框，message 用于说明触发原因 */
   function ask_restart(
-    message = '该更改需要重启机器人生效，是否立即重启？',
-    title = '需要重启机器人',
+    message = t_global('ui.restart_default_message'),
+    title = t_global('ui.restart_default_title'),
   ) {
     if (restarting.value) return
     prompt_title.value = title

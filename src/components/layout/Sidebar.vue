@@ -1,23 +1,70 @@
 <script setup>
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import { use_restart } from '@/composables/use_restart'
 
+const { t } = useI18n()
 const auth_store = useAuthStore()
 const { restarting, ask_restart } = use_restart()
 
 const nav_items = [
-  { path: '/', label: '仪表盘', icon: 'lucide:layout-dashboard', admin_only: false },
-  { path: '/servers', label: '服务器', icon: 'lucide:server', admin_only: false },
-  { path: '/statistics', label: '统计', icon: 'lucide:chart-column', admin_only: false },
-  { path: '/players', label: '玩家', icon: 'lucide:users', admin_only: false },
-  { path: '/config', label: '配置', icon: 'lucide:settings-2', admin_only: true },
-  { path: '/logs', label: '日志', icon: 'lucide:scroll-text', admin_only: false },
-  { path: '/plugins', label: '插件', icon: 'lucide:puzzle', admin_only: false },
-  { path: '/extensions', label: '扩展', icon: 'lucide:package', admin_only: false },
-  { path: '/adapters', label: '适配器', icon: 'lucide:unplug', admin_only: false },
-  { path: '/users', label: '用户', icon: 'lucide:shield-check', admin_only: true },
+  { path: '/', label_key: 'nav.dashboard', icon: 'lucide:layout-dashboard', admin_only: false },
+  {
+    path: '/servers',
+    label_key: 'layout.sidebar_nav_servers',
+    icon: 'lucide:server',
+    admin_only: false,
+  },
+  {
+    path: '/statistics',
+    label_key: 'layout.sidebar_nav_statistics',
+    icon: 'lucide:chart-column',
+    admin_only: false,
+  },
+  {
+    path: '/players',
+    label_key: 'layout.sidebar_nav_players',
+    icon: 'lucide:users',
+    admin_only: false,
+  },
+  {
+    path: '/config',
+    label_key: 'layout.sidebar_nav_config',
+    icon: 'lucide:settings-2',
+    admin_only: true,
+  },
+  {
+    path: '/logs',
+    label_key: 'layout.sidebar_nav_logs',
+    icon: 'lucide:scroll-text',
+    admin_only: false,
+  },
+  {
+    path: '/plugins',
+    label_key: 'layout.sidebar_nav_plugins',
+    icon: 'lucide:puzzle',
+    admin_only: false,
+  },
+  {
+    path: '/extensions',
+    label_key: 'layout.sidebar_nav_extensions',
+    icon: 'lucide:package',
+    admin_only: false,
+  },
+  {
+    path: '/adapters',
+    label_key: 'layout.sidebar_nav_adapters',
+    icon: 'lucide:unplug',
+    admin_only: false,
+  },
+  {
+    path: '/users',
+    label_key: 'layout.sidebar_nav_users',
+    icon: 'lucide:shield-check',
+    admin_only: true,
+  },
 ]
 </script>
 
@@ -29,16 +76,21 @@ const nav_items = [
       </div>
       <div class="brand-text">
         <span class="brand-name">UniBot</span>
-        <span class="brand-sub">控制面板</span>
+        <span class="brand-sub">{{ t('layout.sidebar_brand_sub') }}</span>
       </div>
       <button
         v-if="auth_store.is_admin"
         class="restart-button"
         type="button"
-        title="重启机器人"
-        aria-label="重启机器人"
+        :title="t('layout.sidebar_restart_title')"
+        :aria-label="t('layout.sidebar_restart_title')"
         :disabled="restarting"
-        @click="ask_restart('当前连接会短暂中断，服务恢复后页面将自动刷新。', '确认重启机器人？')"
+        @click="
+          ask_restart(
+            t('layout.sidebar_restart_message'),
+            t('layout.sidebar_restart_confirm_title'),
+          )
+        "
       >
         <Icon icon="lucide:refresh-cw" width="16" :class="{ spinning: restarting }" />
       </button>
@@ -53,14 +105,14 @@ const nav_items = [
         :class="{ 'nav-item--exact': item.path === '/' }"
       >
         <Icon :icon="item.icon" width="16" />
-        <span>{{ item.label }}</span>
+        <span>{{ t(item.label_key) }}</span>
       </RouterLink>
     </nav>
 
     <div class="sidebar-footer">
       <RouterLink to="/settings" class="nav-item">
         <Icon icon="lucide:settings" width="16" />
-        <span>个人设置</span>
+        <span>{{ t('nav.settings') }}</span>
       </RouterLink>
     </div>
   </aside>

@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
+import { current_locale } from '@/i18n'
 import { useServerStore } from '@/stores/server'
 import { useAuthStore } from '@/stores/auth'
 import { use_async_action } from '@/composables/use_async_action'
@@ -18,6 +20,7 @@ import { format_mb } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const server_store = useServerStore()
 const auth_store = useAuthStore()
 const { run } = use_async_action()
@@ -44,7 +47,17 @@ const player_percent = computed(() => {
   return (detail.value.players / detail.value.max_players) * 100
 })
 
-const now_time = () => new Date().toLocaleTimeString('zh-CN', { hour12: false })
+const players_label = computed(() =>
+  t('servers.server_detail_players_label', {
+    current: detail.value?.players ?? 0,
+    max: detail.value?.max_players ?? 0,
+  }),
+)
+
+/** 终端时间戳按当前语言选择 locale（zh-CN / en-US） */
+const locale_tag = computed(() => (current_locale() === 'zh' ? 'zh-CN' : 'en-US'))
+
+const now_time = () => new Date().toLocaleTimeString(locale_tag.value, { hour12: false })
 
 function push_line(kind, text) {
   terminal_lines.value.push({ kind, text, time: now_time() })
@@ -61,10 +74,10 @@ onMounted(async () => {
     if (data.server !== server_name.value) return
     if (data.event === 'join') {
       if (!player_list.value.includes(data.player)) player_list.value.push(data.player)
-      push_line('response', `玩家 ${data.player} 加入了服务器`)
+      push_line('response', t('servers.server_detail_player_joined', { player: data.player }))
     } else if (data.event === 'leave') {
       player_list.value = player_list.value.filter((name) => name !== data.player)
-      push_line('response', `玩家 ${data.player} 离开了服务器`)
+      push_line('response', t('servers.server_detail_player_left', { player: data.player }))
     }
   })
 })
@@ -82,7 +95,7 @@ async function refresh() {
     ])
     detail.value = detail_data
     player_list.value = players_data.players || []
-  }, '获取服务器信息失败')
+  }, t('servers.server_detail_fetch_failed'))
   loading.value = false
 }
 
@@ -98,9 +111,9 @@ async function run_command() {
 
   try {
     const data = await server_store.execute_command(server_name.value, command)
-    push_line('response', data?.response || '(无响应)')
+    push_line('response', data?.response || t('servers.server_detail_no_response'))
   } catch (error) {
-    push_line('error', error.message || '指令执行失败')
+    push_line('error', error.message || t('servers.server_detail_command_failed'))
   } finally {
     executing.value = false
   }
@@ -132,7 +145,7 @@ function handle_command_keydown(event) {
       <div>
         <button class="back-link" @click="router.push('/servers')">
           <Icon icon="lucide:arrow-left" width="14" />
-          返回服务器列表
+          {{ t('servers.server_detail_back_to_list') }}
         </button>
         <h1 class="page-title server-title">
           <Icon
@@ -148,7 +161,7 @@ function handle_command_keydown(event) {
       </div>
       <div class="page-actions">
         <Badge v-if="detail" :variant="detail.online ? 'success' : 'neutral'">
-          {{ detail.online ? '在线' : '离线' }}
+          {{ detail.online ? t('common.online') : t('common.offline') }}
         </Badge>
         <Button variant="secondary" icon-only @click="refresh">
           <Icon icon="lucide:refresh-cw" width="15" />
@@ -157,42 +170,40 @@ function handle_command_keydown(event) {
     </div>
 
     <div v-if="loading && !detail" class="card">
-      <div class="loading-block"><Spinner :size="18" /> 加载中…</div>
+      <div class="loading-block"><Spinner :size="18" /> {{ t('common.loading') }}</div>
     </div>
 
     <template v-else>
       <!-- 信息条 -->
       <section class="info-strip card">
         <div class="info-cell">
-          <span class="info-label">类型</span>
+          <span class="info-label">{{ t('servers.server_detail_type_label') }}</span>
           <span class="info-value">
             <Icon :icon="server_type_icon(detail?.server_type)" width="14" />
             {{ server_type_label(detail?.server_type) }}
           </span>
         </div>
         <div class="info-cell">
-          <span class="info-label">版本</span>
+          <span class="info-label">{{ t('servers.server_detail_version_label') }}</span>
           <span class="info-value mono">{{ detail?.version || '—' }}</span>
         </div>
         <div class="info-cell">
-          <span class="info-label">CPU 负载</span>
+          <span class="info-label">{{ t('servers.server_detail_cpu_label') }}</span>
           <span class="info-value mono">{{ detail?.cpu_load ?? '—' }}%</span>
         </div>
         <div class="info-cell">
-          <span class="info-label">系统内存</span>
+          <span class="info-label">{{ t('servers.server_detail_system_memory_label') }}</span>
           <span class="info-value mono">{{ detail?.memory_percent ?? '—' }}%</span>
         </div>
         <div class="info-cell">
-          <span class="info-label">JVM 内存</span>
+          <span class="info-label">{{ t('servers.server_detail_jvm_memory_label') }}</span>
           <span class="info-value mono"
             >{{ format_mb(detail?.jvm_memory_used) }} /
             {{ format_mb(detail?.jvm_memory_max) }}</span
           >
         </div>
         <div class="info-cell info-cell--grow">
-          <span class="info-label"
-            >玩家 {{ detail?.players ?? 0 }} / {{ detail?.max_players ?? 0 }}</span
-          >
+          <span class="info-label">{{ players_label }}</span>
           <Progress :value="player_percent" />
         </div>
       </section>
@@ -201,11 +212,15 @@ function handle_command_keydown(event) {
         <!-- 在线玩家 -->
         <section class="card">
           <div class="card-header">
-            <h3 class="card-title">在线玩家</h3>
+            <h3 class="card-title">{{ t('servers.server_detail_online_players_title') }}</h3>
             <Badge variant="accent">{{ player_list.length }}</Badge>
           </div>
           <div class="player-panel">
-            <EmptyState v-if="player_list.length === 0" icon="lucide:user-x" title="暂无在线玩家" />
+            <EmptyState
+              v-if="player_list.length === 0"
+              icon="lucide:user-x"
+              :title="t('servers.server_detail_no_online_players')"
+            />
             <ul v-else class="player-list">
               <li v-for="player in player_list" :key="player" class="player-item">
                 <PlayerHead :name="player" :size="24" />
@@ -218,12 +233,12 @@ function handle_command_keydown(event) {
         <!-- RCON 终端 -->
         <section class="card">
           <div class="card-header">
-            <h3 class="card-title">指令终端</h3>
-            <span class="text-xs text-muted">↑ / ↓ 切换历史指令</span>
+            <h3 class="card-title">{{ t('servers.server_detail_terminal_title') }}</h3>
+            <span class="text-xs text-muted">{{ t('servers.server_detail_history_hint') }}</span>
           </div>
           <div ref="terminal_ref" class="terminal">
             <div v-if="terminal_lines.length === 0" class="terminal-empty">
-              在下方输入指令并回车执行
+              {{ t('servers.server_detail_terminal_empty') }}
             </div>
             <div
               v-for="(line, index) in terminal_lines"
@@ -241,7 +256,7 @@ function handle_command_keydown(event) {
             <input
               v-model="command_input"
               class="mono"
-              placeholder="如：list、say hello"
+              :placeholder="t('servers.server_detail_command_placeholder')"
               :disabled="!auth_store.is_operator"
               @keydown="handle_command_keydown"
             />
@@ -252,11 +267,11 @@ function handle_command_keydown(event) {
               :loading="executing"
               :disabled="!auth_store.is_operator"
             >
-              执行
+              {{ t('servers.server_detail_execute') }}
             </Button>
           </form>
           <p v-if="!auth_store.is_operator" class="terminal-tip">
-            当前角色无执行权限，需操作员及以上角色
+            {{ t('servers.server_detail_permission_tip') }}
           </p>
         </section>
       </div>

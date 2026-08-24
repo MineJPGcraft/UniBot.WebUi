@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useStatisticsStore } from '@/stores/statistics'
@@ -17,6 +18,7 @@ const AUTO_REFRESH_INTERVAL_MS = 60000
 
 const statistics_store = useStatisticsStore()
 const auth_store = useAuthStore()
+const { t } = useI18n()
 const { statistics } = storeToRefs(statistics_store)
 const { run } = use_async_action()
 
@@ -24,40 +26,40 @@ const trend_days = ref('30')
 const reset_dialog_open = ref(false)
 const resetting = ref(false)
 
-const trend_options = [
-  { value: '7', label: '最近 7 天' },
-  { value: '14', label: '最近 14 天' },
-  { value: '30', label: '最近 30 天' },
-]
+const trend_options = computed(() => [
+  { value: '7', label: t('statistics.trend_last_7_days') },
+  { value: '14', label: t('statistics.trend_last_14_days') },
+  { value: '30', label: t('statistics.trend_last_30_days') },
+])
 
 const summary_items = computed(() => [
   {
-    label: '机器人发言总数',
+    label: t('statistics.summary_sent_total'),
     value: statistics.value?.summary?.sent_total ?? '—',
     icon: 'lucide:message-square-share',
   },
   {
-    label: '收到消息总数',
+    label: t('statistics.summary_received_total'),
     value: statistics.value?.summary?.received_total ?? '—',
     icon: 'lucide:inbox',
   },
   {
-    label: '群聊消息',
+    label: t('statistics.summary_group_messages'),
     value: statistics.value?.summary?.group_received_total ?? '—',
     icon: 'lucide:users-round',
   },
   {
-    label: '今日活跃群聊',
+    label: t('statistics.summary_active_groups'),
     value: statistics.value?.summary?.active_groups_today ?? '—',
     icon: 'lucide:flame',
   },
 ])
 
 /** 趋势图数据与序列定义（颜色为字面量，对应 --accent / --success，ECharts canvas 不支持 CSS 变量） */
-const trend_series = [
-  { key: 'received', name: '收到消息', color: '#2563eb' },
-  { key: 'sent', name: '机器人发言', color: '#16a34a' },
-]
+const trend_series = computed(() => [
+  { key: 'received', name: t('statistics.series_received'), color: '#2563eb' },
+  { key: 'sent', name: t('statistics.series_sent'), color: '#16a34a' },
+])
 const trend_items = computed(() =>
   (statistics.value?.trend || []).map((day) => ({
     label: day.date,
@@ -66,10 +68,10 @@ const trend_items = computed(() =>
   })),
 )
 
-const chart_type_options = [
-  { value: 'bar', label: '柱状图' },
-  { value: 'line', label: '折线图' },
-]
+const chart_type_options = computed(() => [
+  { value: 'bar', label: t('statistics.chart_type_bar') },
+  { value: 'line', label: t('statistics.chart_type_line') },
+])
 const chart_type = ref('bar')
 
 /** 活跃群聊排行 */
@@ -84,7 +86,10 @@ const max_platform_count = computed(() =>
 const connected_bots = computed(() => statistics.value?.bots || [])
 
 async function refresh() {
-  await run(() => statistics_store.fetch_statistics(Number(trend_days.value)), '获取统计数据失败')
+  await run(
+    () => statistics_store.fetch_statistics(Number(trend_days.value)),
+    t('statistics.fetch_failed'),
+  )
 }
 
 /** 群聊最近活跃时间（Unix 秒）转可读格式 */
@@ -93,7 +98,11 @@ function format_active_time(timestamp_seconds) {
 }
 
 async function confirm_reset() {
-  const ok = await run(() => statistics_store.reset_statistics(), '清空统计数据失败', resetting)
+  const ok = await run(
+    () => statistics_store.reset_statistics(),
+    t('statistics.reset_failed'),
+    resetting,
+  )
   if (ok) reset_dialog_open.value = false
 }
 
@@ -111,18 +120,18 @@ onUnmounted(() => clearInterval(refresh_timer))
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">数据统计</h1>
-        <p class="page-desc">机器人消息量、活跃群聊与在线账号总览</p>
+        <h1 class="page-title">{{ t('statistics.page_title') }}</h1>
+        <p class="page-desc">{{ t('statistics.page_description') }}</p>
       </div>
       <div class="page-actions">
         <Select v-model="trend_days" :options="trend_options" @update:model-value="refresh" />
         <Button variant="secondary" :loading="statistics_store.loading" @click="refresh">
           <Icon icon="lucide:refresh-cw" width="15" />
-          刷新
+          {{ t('common.refresh') }}
         </Button>
         <Button v-if="auth_store.is_admin" variant="danger" @click="reset_dialog_open = true">
           <Icon icon="lucide:eraser" width="15" />
-          清空统计
+          {{ t('statistics.reset_action') }}
         </Button>
       </div>
     </div>
@@ -140,7 +149,7 @@ onUnmounted(() => clearInterval(refresh_timer))
         <Icon icon="lucide:bot" width="16" class="stat-icon" />
         <div class="stat-body">
           <span class="stat-value">{{ connected_bots.length }}</span>
-          <span class="stat-label">已连接机器人</span>
+          <span class="stat-label">{{ t('statistics.summary_connected_bots') }}</span>
         </div>
       </div>
     </section>
@@ -148,10 +157,12 @@ onUnmounted(() => clearInterval(refresh_timer))
     <!-- 消息趋势 -->
     <section class="card trend-card">
       <div class="card-header">
-        <h3 class="card-title">消息趋势</h3>
+        <h3 class="card-title">{{ t('statistics.trend_card_title') }}</h3>
         <div class="trend-actions">
           <Select v-model="chart_type" :options="chart_type_options" />
-          <Badge variant="neutral">{{ trend_days }} 天</Badge>
+          <Badge variant="neutral">{{
+            t('statistics.days_count_badge', { days: trend_days })
+          }}</Badge>
         </div>
       </div>
       <div class="card-body">
@@ -163,15 +174,21 @@ onUnmounted(() => clearInterval(refresh_timer))
       <!-- 活跃群聊排行 -->
       <section class="card">
         <div class="card-header">
-          <h3 class="card-title">活跃群聊</h3>
-          <Badge variant="accent">累计 {{ statistics?.summary?.tracked_groups ?? 0 }} 个</Badge>
+          <h3 class="card-title">{{ t('statistics.groups_card_title') }}</h3>
+          <Badge variant="accent">
+            {{
+              t('statistics.tracked_groups_badge', {
+                count: statistics?.summary?.tracked_groups ?? 0,
+              })
+            }}
+          </Badge>
         </div>
         <div class="card-body group-panel">
           <EmptyState
             v-if="active_groups.length === 0"
             icon="lucide:message-circle-off"
-            title="暂无群聊数据"
-            description="机器人在群聊中收到消息后，这里会展示活跃排行"
+            :title="t('statistics.groups_empty_title')"
+            :description="t('statistics.groups_empty_description')"
           />
           <ul v-else class="group-rows">
             <li v-for="group in active_groups" :key="group.key" class="group-row">
@@ -195,13 +212,13 @@ onUnmounted(() => clearInterval(refresh_timer))
         <!-- 平台分布 -->
         <section class="card">
           <div class="card-header">
-            <h3 class="card-title">平台分布</h3>
+            <h3 class="card-title">{{ t('statistics.platforms_card_title') }}</h3>
           </div>
           <div class="card-body">
             <EmptyState
               v-if="platform_rank.length === 0"
               icon="lucide:radio"
-              title="暂无平台数据"
+              :title="t('statistics.platforms_empty_title')"
             />
             <ul v-else class="platform-rows">
               <li v-for="item in platform_rank" :key="item.platform" class="platform-row">
@@ -221,17 +238,21 @@ onUnmounted(() => clearInterval(refresh_timer))
         <!-- 已连接机器人 -->
         <section class="card">
           <div class="card-header">
-            <h3 class="card-title">已连接机器人</h3>
+            <h3 class="card-title">{{ t('statistics.bots_card_title') }}</h3>
             <Badge :variant="connected_bots.length > 0 ? 'success' : 'danger'">
-              {{ connected_bots.length > 0 ? `${connected_bots.length} 个在线` : '暂无连接' }}
+              {{
+                connected_bots.length > 0
+                  ? t('statistics.bots_online_badge', { count: connected_bots.length })
+                  : t('statistics.bots_none_badge')
+              }}
             </Badge>
           </div>
           <div class="card-body">
             <EmptyState
               v-if="connected_bots.length === 0"
               icon="lucide:unplug"
-              title="暂无机器人连接"
-              description="机器人账号通过适配器连接后会显示在这里"
+              :title="t('statistics.bots_empty_title')"
+              :description="t('statistics.bots_empty_description')"
             />
             <ul v-else class="bot-rows">
               <li v-for="account in connected_bots" :key="account.self_id" class="bot-row">
@@ -251,9 +272,9 @@ onUnmounted(() => clearInterval(refresh_timer))
     <!-- 清空确认弹窗 -->
     <Dialog
       v-model="reset_dialog_open"
-      title="清空统计数据"
-      description="将清空全部历史统计数据并立即生效，此操作不可恢复。"
-      confirm-text="确认清空"
+      :title="t('statistics.reset_dialog_title')"
+      :description="t('statistics.reset_dialog_description')"
+      :confirm-text="t('statistics.reset_dialog_confirm')"
       confirm-variant="danger"
       :loading="resetting"
       @confirm="confirm_reset"

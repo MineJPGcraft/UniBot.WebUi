@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useStatusStore } from '@/stores/status'
@@ -13,6 +14,7 @@ import { role_label, format_datetime, format_uptime } from '@/utils/format'
 
 const auth_store = useAuthStore()
 const status_store = useStatusStore()
+const { t } = useI18n()
 const toast = use_toast()
 const { run } = use_async_action()
 const { user } = storeToRefs(auth_store)
@@ -42,85 +44,92 @@ const updating = ref(false)
 const update_hint = computed(() => {
   if (!status.value?.latest_version) return null
   if (status.value.has_update) {
-    return { variant: 'warning', text: `发现新版本 ${status.value.latest_version}` }
+    return {
+      variant: 'warning',
+      text: t('settings.update_available_hint', { version: status.value.latest_version }),
+    }
   }
-  return { variant: 'success', text: '已是最新版本' }
+  return { variant: 'success', text: t('settings.up_to_date_hint') }
 })
 
 async function check_update() {
-  const ok = await run(() => status_store.check_update(), '检测失败', checking_update)
+  const ok = await run(
+    () => status_store.check_update(),
+    t('settings.check_failed'),
+    checking_update,
+  )
   if (!ok) return
   if (status.value?.has_update) {
-    toast.info(`发现新版本 ${status.value.latest_version}，请及时更新`)
+    toast.info(t('settings.update_available_toast', { version: status.value.latest_version }))
   } else {
-    toast.success('当前已是最新版本')
+    toast.success(t('settings.up_to_date_toast'))
   }
 }
 
 async function update_bot() {
-  const ok = await run(() => status_store.update_bot(), '更新失败', updating)
+  const ok = await run(() => status_store.update_bot(), t('settings.update_failed'), updating)
   if (ok) {
-    toast.success('更新成功，机器人正在重启')
+    toast.success(t('settings.update_success'))
   }
 }
 
-const about_links = [
+const about_links = computed(() => [
   {
-    label: '官方网站',
+    label: t('settings.link_website'),
     value: 'bot.mcjpg.dev',
     url: 'https://bot.mcjpg.dev/',
     icon: 'lucide:globe',
   },
   {
-    label: '项目地址',
+    label: t('settings.link_project'),
     value: 'github.com/MineJPGcraft/UniBot',
     url: 'https://github.com/MineJPGcraft/UniBot',
     icon: 'lucide:github',
   },
   {
-    label: 'QQ 交流群',
+    label: t('settings.link_qq_group'),
     value: '962802248',
     url: 'https://qm.qq.com/q/qyq2XH6qkw',
     icon: 'lucide:users',
   },
-]
+])
 
 async function save_profile() {
   if (!nickname.value.trim()) {
-    toast.error('昵称不能为空')
+    toast.error(t('settings.nickname_required'))
     return
   }
   const ok = await run(
     () => auth_store.update_profile(nickname.value.trim()),
-    '更新失败',
+    t('settings.profile_update_failed'),
     saving_profile,
   )
   if (ok) {
-    toast.success('昵称已更新')
+    toast.success(t('settings.nickname_updated'))
   }
 }
 
 async function save_password() {
   const { old_password, new_password, confirm_password } = password_form.value
   if (!old_password || !new_password) {
-    toast.error('请填写完整')
+    toast.error(t('settings.password_form_incomplete'))
     return
   }
   if (new_password.length < 6) {
-    toast.error('新密码至少 6 位')
+    toast.error(t('settings.password_too_short'))
     return
   }
   if (new_password !== confirm_password) {
-    toast.error('两次输入的新密码不一致')
+    toast.error(t('settings.password_mismatch'))
     return
   }
   const ok = await run(
     () => auth_store.change_password(old_password, new_password),
-    '修改失败',
+    t('settings.password_change_failed'),
     saving_password,
   )
   if (ok) {
-    toast.success('密码已修改')
+    toast.success(t('settings.password_changed'))
     password_form.value = { old_password: '', new_password: '', confirm_password: '' }
   }
 }
@@ -130,15 +139,15 @@ async function save_password() {
   <div class="page settings-page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">个人设置</h1>
-        <p class="page-desc">管理你的账户信息与会话</p>
+        <h1 class="page-title">{{ t('settings.page_title') }}</h1>
+        <p class="page-desc">{{ t('settings.page_description') }}</p>
       </div>
     </div>
 
     <!-- 账户信息 -->
     <section class="card">
       <div class="card-header">
-        <h3 class="card-title">账户信息</h3>
+        <h3 class="card-title">{{ t('settings.account_section') }}</h3>
       </div>
       <div class="card-body profile-body">
         <div class="profile-card">
@@ -150,17 +159,19 @@ async function save_password() {
             </div>
             <div class="profile-meta mono">@{{ user?.username }}</div>
             <div class="profile-meta text-muted">
-              注册于 {{ format_datetime(user?.created_at) }}
+              {{ t('settings.registered_at', { time: format_datetime(user?.created_at) }) }}
             </div>
           </div>
         </div>
 
         <form class="profile-form" @submit.prevent="save_profile">
           <div class="form-row">
-            <label class="form-label">昵称</label>
-            <Input v-model="nickname" placeholder="显示名称" />
+            <label class="form-label">{{ t('settings.nickname_label') }}</label>
+            <Input v-model="nickname" :placeholder="t('settings.nickname_placeholder')" />
           </div>
-          <Button variant="primary" type="submit" :loading="saving_profile">保存昵称</Button>
+          <Button variant="primary" type="submit" :loading="saving_profile">{{
+            t('settings.save_nickname')
+          }}</Button>
         </form>
       </div>
     </section>
@@ -168,25 +179,29 @@ async function save_password() {
     <!-- 修改密码 -->
     <section class="card">
       <div class="card-header">
-        <h3 class="card-title">修改密码</h3>
+        <h3 class="card-title">{{ t('settings.password_section') }}</h3>
       </div>
       <div class="card-body">
         <form class="password-form" @submit.prevent="save_password">
           <div class="form-row">
-            <label class="form-label">当前密码</label>
+            <label class="form-label">{{ t('settings.current_password_label') }}</label>
             <Input v-model="password_form.old_password" type="password" />
           </div>
           <div class="form-row">
-            <label class="form-label">新密码</label>
-            <Input v-model="password_form.new_password" type="password" placeholder="至少 6 位" />
+            <label class="form-label">{{ t('settings.new_password_label') }}</label>
+            <Input
+              v-model="password_form.new_password"
+              type="password"
+              :placeholder="t('settings.new_password_placeholder')"
+            />
           </div>
           <div class="form-row">
-            <label class="form-label">确认新密码</label>
+            <label class="form-label">{{ t('settings.confirm_password_label') }}</label>
             <Input v-model="password_form.confirm_password" type="password" />
           </div>
           <Button variant="primary" type="submit" :loading="saving_password">
             <Icon icon="lucide:key-round" width="14" />
-            修改密码
+            {{ t('settings.change_password') }}
           </Button>
         </form>
       </div>
@@ -195,16 +210,16 @@ async function save_password() {
     <!-- 当前会话 -->
     <section class="card">
       <div class="card-header">
-        <h3 class="card-title">当前会话</h3>
+        <h3 class="card-title">{{ t('settings.session_section') }}</h3>
       </div>
       <div class="card-body session-body">
         <div class="session-row">
-          <span class="session-label">最后登录</span>
+          <span class="session-label">{{ t('settings.last_login_label') }}</span>
           <span>{{ format_datetime(user?.last_login_at) }}</span>
         </div>
         <div class="session-row">
-          <span class="session-label">access_token 有效期</span>
-          <span>2 小时（过期自动刷新）</span>
+          <span class="session-label">{{ t('settings.token_lifetime_label') }}</span>
+          <span>{{ t('settings.token_lifetime_value') }}</span>
         </div>
       </div>
     </section>
@@ -220,13 +235,13 @@ async function save_password() {
               UniBot
               <Badge variant="accent">{{ status?.version || '—' }}</Badge>
             </div>
-            <p class="about-desc">一款与 Minecraft 互通的 NoneBot2 机器人</p>
+            <p class="about-desc">{{ t('settings.about_description') }}</p>
           </div>
         </div>
         <div class="about-banner-side">
           <span class="about-pulse">
             <span class="pulse-dot" />
-            已运行 {{ format_uptime(status?.uptime) }}
+            {{ t('settings.running_duration', { duration: format_uptime(status?.uptime) }) }}
           </span>
           <div class="about-banner-actions">
             <button
@@ -237,7 +252,7 @@ async function save_password() {
               @click="update_bot"
             >
               <Icon icon="lucide:download" width="13" :class="{ spinning: updating }" />
-              立即更新
+              {{ t('settings.update_now') }}
             </button>
             <button
               v-if="auth_store.is_admin"
@@ -247,7 +262,7 @@ async function save_password() {
               @click="check_update"
             >
               <Icon icon="lucide:refresh-cw" width="13" :class="{ spinning: checking_update }" />
-              检测更新
+              {{ t('settings.check_update') }}
             </button>
           </div>
         </div>
@@ -272,7 +287,7 @@ async function save_password() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          前往下载
+          {{ t('settings.download_link') }}
           <Icon icon="lucide:arrow-up-right" width="13" />
         </a>
       </div>

@@ -12,12 +12,15 @@ import {
   SelectItemText,
 } from 'reka-ui'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 
 const model = defineModel({ type: String, default: '' })
 
+const { t } = useI18n()
+
 const props = defineProps({
   options: { type: Array, required: true }, // [{ value, label }]
-  placeholder: { type: String, default: '请选择' },
+  placeholder: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
 })
 
@@ -39,8 +42,8 @@ const selected_label = computed(() => {
 <template>
   <SelectRoot v-model="model" :disabled="disabled">
     <SelectTrigger class="ui-select-trigger">
-      <SelectValue :placeholder="placeholder">
-        {{ selected_label || placeholder }}
+      <SelectValue :placeholder="placeholder || t('common.please_select')">
+        {{ selected_label || placeholder || t('common.please_select') }}
       </SelectValue>
       <SelectIcon>
         <Icon icon="lucide:chevron-down" width="14" />

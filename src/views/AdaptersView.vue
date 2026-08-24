@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useAdapterStore } from '@/stores/adapter'
@@ -16,6 +17,7 @@ import Switch from '@/components/ui/Switch.vue'
 
 const adapter_store = useAdapterStore()
 const auth_store = useAuthStore()
+const { t } = useI18n()
 const toast = use_toast()
 const { run } = use_async_action()
 const { ask_restart } = use_restart()
@@ -36,7 +38,7 @@ const adapter_items = computed(() => {
       id: adapter.module_name,
       name: adapter.name,
       module_name: adapter.module_name,
-      description: '手动注册的适配器',
+      description: t('adapters.custom_description'),
       platforms: [],
       registered: true,
       removable: adapter.removable !== false,
@@ -50,16 +52,16 @@ const adapter_items = computed(() => {
 })
 
 onMounted(async () => {
-  await run(() => adapter_store.fetch_all(), '获取适配器列表失败')
+  await run(() => adapter_store.fetch_all(), t('adapters.fetch_failed'))
 })
 
 async function install_adapter(adapter) {
   installing_adapter.value = adapter.id
-  const ok = await run(() => adapter_store.install(adapter.id), '安装适配器失败')
+  const ok = await run(() => adapter_store.install(adapter.id), t('adapters.install_failed'))
   installing_adapter.value = ''
   if (ok) {
-    toast.success(`${adapter.name} 已安装并注册，重启后生效`)
-    ask_restart(`适配器 ${adapter.name} 已安装，需要重启机器人生效，是否立即重启？`)
+    toast.success(t('adapters.install_success', { name: adapter.name }))
+    ask_restart(t('adapters.restart_after_install_confirm', { name: adapter.name }))
   }
 }
 
@@ -67,14 +69,16 @@ async function toggle_adapter(adapter, enabled) {
   toggling_adapter.value = adapter.id
   const ok = await run(
     () => adapter_store.toggle_register(adapter.name, adapter.module_name, enabled),
-    '操作失败',
+    t('common.operation_failed'),
   )
   toggling_adapter.value = ''
   if (ok) {
     toast.success(
-      enabled ? `${adapter.name} 已启用（重启后生效）` : `${adapter.name} 已禁用（重启后生效）`,
+      enabled
+        ? t('adapters.enable_success', { name: adapter.name })
+        : t('adapters.disable_success', { name: adapter.name }),
     )
-    ask_restart(`适配器 ${adapter.name} 的启停需要重启机器人生效，是否立即重启？`)
+    ask_restart(t('adapters.restart_after_toggle_confirm', { name: adapter.name }))
   }
 }
 
@@ -90,7 +94,7 @@ function confirm_uninstall(adapter) {
 function goto_adapter_config(adapter) {
   const keys = adapter.config_keys || []
   if (keys.length === 0) {
-    toast.info(`暂无 ${adapter.name} 的专属配置项`)
+    toast.info(t('adapters.no_config_hint', { name: adapter.name }))
     return
   }
   router.push({ name: 'ConfigView', query: { tab: 'env', key: keys[0] } })
@@ -100,13 +104,16 @@ async function do_uninstall() {
   const adapter = pending_uninstall.value
   if (!adapter) return
   uninstalling_adapter.value = adapter.module_name
-  const ok = await run(() => adapter_store.uninstall(adapter.name, adapter.module_name), '卸载失败')
+  const ok = await run(
+    () => adapter_store.uninstall(adapter.name, adapter.module_name),
+    t('adapters.uninstall_failed'),
+  )
   uninstalling_adapter.value = ''
   if (ok) {
-    toast.success(`${adapter.name} 及其依赖已彻底删除（重启后生效）`)
+    toast.success(t('adapters.uninstall_success', { name: adapter.name }))
     uninstall_dialog_open.value = false
     pending_uninstall.value = null
-    ask_restart(`适配器 ${adapter.name} 已删除，需要重启机器人生效，是否立即重启？`)
+    ask_restart(t('adapters.restart_after_uninstall_confirm', { name: adapter.name }))
   }
 }
 </script>
@@ -115,14 +122,18 @@ async function do_uninstall() {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">适配器管理</h1>
-        <p class="page-desc">安装、启用或卸载 NoneBot 平台适配器</p>
+        <h1 class="page-title">{{ t('adapters.page_title') }}</h1>
+        <p class="page-desc">{{ t('adapters.page_description') }}</p>
       </div>
     </div>
 
     <section class="adapter-panel card">
-      <div v-if="loading" class="loading-block"><Spinner :size="18" /> 加载中…</div>
-      <p v-else-if="adapter_items.length === 0" class="adapter-empty">暂无适配器</p>
+      <div v-if="loading" class="loading-block">
+        <Spinner :size="18" /> {{ t('common.loading') }}
+      </div>
+      <p v-else-if="adapter_items.length === 0" class="adapter-empty">
+        {{ t('adapters.empty_list') }}
+      </p>
       <ul v-else class="adapter-list">
         <li v-for="adapter in adapter_items" :key="adapter.id" class="adapter-row">
           <div class="adapter-icon"><Icon icon="lucide:unplug" width="18" /></div>
@@ -134,7 +145,13 @@ async function do_uninstall() {
                   adapter.registered ? 'success' : adapter.installed ? 'warning' : 'neutral'
                 "
               >
-                {{ adapter.registered ? '已启用' : adapter.installed ? '已禁用' : '未安装' }}
+                {{
+                  adapter.registered
+                    ? t('common.enabled')
+                    : adapter.installed
+                      ? t('common.disabled')
+                      : t('adapters.status_not_installed')
+                }}
               </Badge>
             </div>
             <span class="adapter-package mono">{{ adapter.package || adapter.module_name }}</span>
@@ -145,16 +162,16 @@ async function do_uninstall() {
           </div>
           <div class="adapter-actions">
             <template v-if="adapter.removable === false">
-              <span class="protected-adapter" title="核心适配器，禁止操作">
+              <span class="protected-adapter" :title="t('adapters.protected_tooltip')">
                 <Icon icon="lucide:lock-keyhole" width="15" />
-                内置
+                {{ t('adapters.protected_label') }}
               </span>
               <Button
                 v-if="adapter.config_keys && adapter.config_keys.length > 0"
                 variant="ghost"
                 size="sm"
                 icon-only
-                title="配置此适配器"
+                :title="t('adapters.config_button_title')"
                 :disabled="!auth_store.is_admin"
                 @click="goto_adapter_config(adapter)"
               >
@@ -166,14 +183,18 @@ async function do_uninstall() {
                 :model-value="adapter.registered"
                 :disabled="!auth_store.is_admin || toggling_adapter === adapter.id"
                 @update:model-value="(val) => toggle_adapter(adapter, val)"
-                :title="adapter.registered ? '禁用后将取消注册（依赖不删除）' : '启用后将重新注册'"
+                :title="
+                  adapter.registered
+                    ? t('adapters.disable_toggle_tooltip')
+                    : t('adapters.enable_toggle_tooltip')
+                "
               />
               <div class="action-group">
                 <Button
                   variant="ghost"
                   size="sm"
                   icon-only
-                  title="配置此适配器"
+                  :title="t('adapters.config_button_title')"
                   :disabled="!auth_store.is_admin"
                   @click="goto_adapter_config(adapter)"
                 >
@@ -183,7 +204,7 @@ async function do_uninstall() {
                   variant="ghost"
                   size="sm"
                   icon-only
-                  title="彻底删除（取消注册并删除依赖）"
+                  :title="t('adapters.uninstall_button_title')"
                   :disabled="!auth_store.is_admin || Boolean(uninstalling_adapter)"
                   :loading="uninstalling_adapter === adapter.module_name"
                   @click="confirm_uninstall(adapter)"
@@ -201,7 +222,7 @@ async function do_uninstall() {
                 @click="install_adapter(adapter)"
               >
                 <Icon icon="lucide:download" width="14" />
-                安装
+                {{ t('adapters.install_action') }}
               </Button>
             </template>
           </div>
@@ -211,16 +232,18 @@ async function do_uninstall() {
 
     <Dialog
       v-model="uninstall_dialog_open"
-      title="彻底删除适配器"
-      :description="`确定彻底删除 ${pending_uninstall?.name || ''} 吗？这将取消注册并删除依赖包，不可恢复。`"
-      confirm-text="彻底删除"
+      :title="t('adapters.uninstall_dialog_title')"
+      :description="
+        t('adapters.uninstall_dialog_description', { name: pending_uninstall?.name || '' })
+      "
+      :confirm-text="t('adapters.uninstall_dialog_confirm')"
       confirm-variant="danger"
       :loading="Boolean(uninstalling_adapter)"
       @confirm="do_uninstall"
     >
       <p class="uninstall-warning">
         <Icon icon="lucide:alert-triangle" width="16" />
-        此操作将同时从 pyproject.toml 中移除注册信息和依赖，如需再次使用需重新安装。
+        {{ t('adapters.uninstall_warning') }}
       </p>
     </Dialog>
   </div>

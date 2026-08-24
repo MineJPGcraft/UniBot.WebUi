@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useExtensionStore } from '@/stores/extension'
 import { useAuthStore } from '@/stores/auth'
@@ -20,6 +21,7 @@ import MarketPanel from '@/components/MarketPanel.vue'
 import ExtensionConfigDialog from '@/components/ExtensionConfigDialog.vue'
 import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
 
+const { t } = useI18n()
 const extension_store = useExtensionStore()
 const auth_store = useAuthStore()
 const config_store = useConfigStore()
@@ -65,11 +67,11 @@ const studio_log_open = ref(false)
 /** 创意工坊首次下载说明弹窗开关 */
 const studio_intro_open = ref(false)
 
-const tabs = [
-  { value: 'installed', label: '已安装扩展', icon: 'lucide:puzzle' },
-  { value: 'market', label: '扩展市场', icon: 'lucide:store' },
-  { value: 'render', label: '渲染设置', icon: 'lucide:image' },
-]
+const tabs = computed(() => [
+  { value: 'installed', label: t('extensions.tab_installed'), icon: 'lucide:puzzle' },
+  { value: 'market', label: t('extensions.tab_market'), icon: 'lucide:store' },
+  { value: 'render', label: t('extensions.tab_render'), icon: 'lucide:image' },
+])
 
 const current_renderer = computed(() => {
   const matched = renderers.value.find((item) => item.current)
@@ -88,7 +90,10 @@ const current_template = computed(
 )
 
 const template_options = computed(() =>
-  templates.value.map((item) => ({ value: item.name, label: item.name || '默认' })),
+  templates.value.map((item) => ({
+    value: item.name,
+    label: item.name || t('extensions.template_default_option'),
+  })),
 )
 
 /** 只展示带配置项的渲染插件 */
@@ -99,23 +104,23 @@ const visible_render_configs = computed(() =>
   }),
 )
 
-const type_labels = {
-  api: 'API',
-  command: '指令',
-  renderer: '渲染引擎',
-  template: '模板',
-  resources: '资源',
-}
+const type_labels = computed(() => ({
+  api: t('extensions.type_api'),
+  command: t('extensions.type_command'),
+  renderer: t('extensions.type_renderer'),
+  template: t('extensions.type_template'),
+  resources: t('extensions.type_resources'),
+}))
 
-const state_labels = {
-  loaded: '已加载',
-  enabled: '已启用',
-  discovered: '已发现',
-  validated: '已校验',
-  failed: '失败',
-  disabled: '已禁用',
-  blocked: '阻塞',
-}
+const state_labels = computed(() => ({
+  loaded: t('extensions.state_loaded'),
+  enabled: t('extensions.state_enabled'),
+  discovered: t('extensions.state_discovered'),
+  validated: t('extensions.state_validated'),
+  failed: t('extensions.state_failed'),
+  disabled: t('extensions.state_disabled'),
+  blocked: t('extensions.state_blocked'),
+}))
 
 const state_variants = {
   loaded: 'success',
@@ -142,17 +147,17 @@ onMounted(async () => {
   search_market()
   const results = await Promise.allSettled(load_tasks)
   if (results.some((result) => result.status === 'rejected')) {
-    toast.error('部分扩展信息加载失败')
+    toast.error(t('extensions.load_partial_failed'))
   }
 })
 
 async function refresh_installed() {
-  await run(() => extension_store.fetch_installed(), '获取扩展列表失败')
+  await run(() => extension_store.fetch_installed(), t('extensions.installed_fetch_list_failed'))
 }
 
 async function search_market() {
   market_filter.value = market_keyword.value
-  await run(() => extension_store.fetch_market(), '获取扩展市场失败')
+  await run(() => extension_store.fetch_market(), t('extensions.market_fetch_failed'))
 }
 
 /** 扩展市场本地搜索过滤（后端接口无搜索参数） */
@@ -171,11 +176,11 @@ async function install_market_extension(item) {
   market_action.value = item.id
   try {
     await extension_store.install_market(item.id)
-    toast.success(`扩展 ${item.name} 安装成功，重启后生效`)
+    toast.success(t('extensions.installed_install_success', { name: item.name }))
     await search_market()
-    ask_restart(`扩展 ${item.name} 安装成功，需要重启机器人生效，是否立即重启？`)
+    ask_restart(t('extensions.installed_install_restart_prompt', { name: item.name }))
   } catch (error) {
-    toast.error(error.message || '安装失败')
+    toast.error(error.message || t('extensions.installed_install_failed'))
   } finally {
     market_action.value = ''
   }
@@ -184,18 +189,18 @@ async function install_market_extension(item) {
 async function uninstall_extension(extension) {
   try {
     await extension_store.uninstall_extension(extension.id)
-    toast.success(`扩展 ${extension.name} 已卸载，重启后生效`)
+    toast.success(t('extensions.installed_uninstall_success', { name: extension.name }))
     await search_market()
-    ask_restart(`扩展 ${extension.name} 已卸载，需要重启机器人生效，是否立即重启？`)
+    ask_restart(t('extensions.installed_uninstall_restart_prompt', { name: extension.name }))
   } catch (error) {
-    toast.error(error.message || '卸载失败')
+    toast.error(error.message || t('extensions.installed_uninstall_failed'))
   }
 }
 
 function type_badges(extension) {
   return (extension.types || []).map((type) => ({
     value: type,
-    label: type_labels[type] || type,
+    label: type_labels.value[type] || type,
   }))
 }
 
@@ -208,10 +213,14 @@ async function toggle_extension(extension, enabled) {
   toggling.value = extension.id
   try {
     await extension_store.set_enabled(extension.id, enabled)
-    toast.success(enabled ? `已启用 ${extension.name}` : `已禁用 ${extension.name}`)
-    ask_restart(`扩展 ${extension.name} 的启停需要重启机器人生效，是否立即重启？`)
+    toast.success(
+      enabled
+        ? t('extensions.installed_enable_success', { name: extension.name })
+        : t('extensions.installed_disable_success', { name: extension.name }),
+    )
+    ask_restart(t('extensions.installed_toggle_restart_prompt', { name: extension.name }))
   } catch (error) {
-    toast.error(error.message || '操作失败')
+    toast.error(error.message || t('extensions.installed_toggle_failed'))
   } finally {
     toggling.value = ''
   }
@@ -226,45 +235,45 @@ async function open_config(extension) {
       extension_store.fetch_config(extension.id),
     ])
   } catch (error) {
-    toast.error(error.message || '获取扩展配置失败')
+    toast.error(error.message || t('extensions.config_fetch_failed'))
   }
 }
 
 async function save_extension_config(values) {
   try {
     await extension_store.save_config(active_extension.value.id, values)
-    toast.success(`配置已保存：${active_extension.value.name}`)
+    toast.success(t('extensions.config_save_success', { name: active_extension.value.name }))
     config_open.value = false
   } catch (error) {
-    toast.error(error.message || '保存配置失败')
+    toast.error(error.message || t('extensions.config_save_failed'))
   }
 }
 
 async function save_render_plugin_config(item, values) {
   try {
     await extension_store.save_render_config(item.id, values)
-    toast.success(`配置已保存：${item.name}`)
+    toast.success(t('extensions.config_save_success', { name: item.name }))
   } catch (error) {
-    toast.error(error.message || '保存配置失败')
+    toast.error(error.message || t('extensions.config_save_failed'))
   }
 }
 
 async function change_renderer(name) {
   try {
     await extension_store.switch_renderer(name)
-    toast.success('渲染引擎已切换，重启后生效')
-    ask_restart('渲染引擎的切换需要重启机器人生效，是否立即重启？')
+    toast.success(t('extensions.renderer_switch_success'))
+    ask_restart(t('extensions.renderer_switch_restart_prompt'))
   } catch (error) {
-    toast.error(error.message || '切换渲染引擎失败')
+    toast.error(error.message || t('extensions.renderer_switch_failed'))
   }
 }
 
 async function change_template(name) {
   try {
     await extension_store.switch_template(name)
-    toast.success('模板已切换，将立即生效')
+    toast.success(t('extensions.template_switch_success'))
   } catch (error) {
-    toast.error(error.message || '切换模板失败')
+    toast.error(error.message || t('extensions.template_switch_failed'))
   }
 }
 
@@ -286,19 +295,19 @@ async function confirm_studio_launch() {
 /** 下载（如缺失）并启动 Extension Studio，随后弹出独立窗口打开访问地址（含登录 token） */
 async function start_studio(will_download) {
   if (will_download) {
-    toast.info('开始下载 Extension Studio…')
+    toast.info(t('extensions.studio_download_started'))
   }
   let url = ''
   const ok = await run(
     () => extension_store.launch_studio().then((value) => (url = value)),
-    '启动 Extension Studio 失败',
+    t('extensions.studio_launch_failed'),
   )
   if (!ok) return
   if (url) {
     open_studio_window(url)
-    toast.success('Extension Studio 已启动，已弹出窗口')
+    toast.success(t('extensions.studio_launch_window_success'))
   } else {
-    toast.success('Extension Studio 已启动')
+    toast.success(t('extensions.studio_launch_success'))
   }
 }
 
@@ -324,9 +333,9 @@ function open_studio_window(url) {
 async function stop_studio() {
   try {
     await extension_store.stop_studio()
-    toast.success('Extension Studio 已停止')
+    toast.success(t('extensions.studio_stop_success'))
   } catch (error) {
-    toast.error(error.message || '停止 Extension Studio 失败')
+    toast.error(error.message || t('extensions.studio_stop_failed'))
   }
 }
 
@@ -336,7 +345,7 @@ async function open_studio_log() {
   try {
     await extension_store.fetch_studio_log()
   } catch (error) {
-    toast.error(error.message || '获取 Studio 日志失败')
+    toast.error(error.message || t('extensions.studio_fetch_log_failed'))
   }
 }
 </script>
@@ -345,8 +354,8 @@ async function open_studio_log() {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">扩展管理</h1>
-        <p class="page-desc">管理已安装扩展、从市场发现新扩展，或调整渲染引擎与模板</p>
+        <h1 class="page-title">{{ t('extensions.page_title') }}</h1>
+        <p class="page-desc">{{ t('extensions.page_description') }}</p>
       </div>
       <div class="page-actions">
         <Button
@@ -354,30 +363,34 @@ async function open_studio_log() {
           variant="ghost"
           :loading="studio_stopping"
           :disabled="!auth_store.is_admin"
-          title="停止 Extension Studio"
+          :title="t('extensions.studio_stop_button_title')"
           @click="stop_studio"
         >
           <Icon icon="lucide:square" width="16" />
-          停止
+          {{ t('extensions.studio_stop_button') }}
         </Button>
         <Button
           variant="ghost"
           :disabled="!studio_status?.installed"
-          title="查看 Extension Studio 日志"
+          :title="t('extensions.studio_log_button_title')"
           @click="open_studio_log"
         >
           <Icon icon="lucide:terminal" width="16" />
-          日志
+          {{ t('extensions.studio_log_button') }}
         </Button>
         <Button
           variant="primary"
           :loading="studio_launching"
           :disabled="!auth_store.is_admin"
-          title="启动 AI 扩展开发平台"
+          :title="t('extensions.studio_launch_button_title')"
           @click="launch_studio"
         >
           <Icon icon="lucide:code-2" width="16" />
-          {{ studio_status?.running ? '打开创意工坊' : '创意工坊' }}
+          {{
+            studio_status?.running
+              ? t('extensions.studio_open_button')
+              : t('extensions.studio_launch_button')
+          }}
         </Button>
       </div>
     </div>
@@ -385,13 +398,15 @@ async function open_studio_log() {
     <Tabs v-model="active_tab" :tabs="tabs">
       <template #installed>
         <div v-if="loading" class="card">
-          <div class="loading-block"><Spinner :size="18" /> 加载中…</div>
+          <div class="loading-block">
+            <Spinner :size="18" /> {{ t('extensions.installed_loading') }}
+          </div>
         </div>
         <EmptyState
           v-else-if="installed_list.length === 0"
           icon="lucide:puzzle"
-          title="暂无扩展"
-          description="尚未发现任何已安装的扩展"
+          :title="t('extensions.installed_empty_title')"
+          :description="t('extensions.installed_empty_description')"
         />
         <div v-else class="extension-grid">
           <article
@@ -406,7 +421,9 @@ async function open_studio_log() {
                 <span class="extension-id mono">{{ extension.id }}</span>
               </div>
               <div class="extension-badges">
-                <Badge v-if="extension.builtin" variant="neutral">内置</Badge>
+                <Badge v-if="extension.builtin" variant="neutral">
+                  {{ t('extensions.installed_builtin_badge') }}
+                </Badge>
                 <Badge v-for="badge in type_badges(extension)" :key="badge.value" variant="accent">
                   {{ badge.label }}
                 </Badge>
@@ -417,7 +434,7 @@ async function open_studio_log() {
             </div>
 
             <div class="extension-desc">
-              <p>{{ extension.description || '暂无描述' }}</p>
+              <p>{{ extension.description || t('extensions.installed_no_description') }}</p>
               <p v-if="extension.failure_reason" class="extension-reason">
                 {{ extension.failure_reason }}
               </p>
@@ -433,19 +450,19 @@ async function open_studio_log() {
                   v-if="has_config(extension)"
                   variant="ghost"
                   size="sm"
-                  title="配置"
+                  :title="t('extensions.installed_config_action')"
                   :disabled="!auth_store.is_admin"
                   @click="open_config(extension)"
                 >
                   <Icon icon="lucide:settings-2" width="14" />
-                  配置
+                  {{ t('extensions.installed_config_action') }}
                 </Button>
                 <Button
                   v-if="!extension.builtin"
                   variant="ghost"
                   size="sm"
                   class="danger"
-                  title="卸载"
+                  :title="t('extensions.installed_uninstall_action')"
                   :disabled="!auth_store.is_admin"
                   @click="uninstall_extension(extension)"
                 >
@@ -467,9 +484,9 @@ async function open_studio_log() {
           :model-value="market_keyword"
           :items="filtered_market_items"
           :loading="market_loading"
-          placeholder="搜索扩展…"
-          empty-title="扩展市场为空"
-          empty-description="暂无可用扩展，或网络连接异常"
+          :placeholder="t('extensions.market_view_search_placeholder')"
+          :empty-title="t('extensions.market_view_empty_title')"
+          :empty-description="t('extensions.market_view_empty_description')"
           item-icon="lucide:package"
           :busy="market_action"
           :show-actions="auth_store.is_admin"
@@ -484,13 +501,13 @@ async function open_studio_log() {
         <div class="render-panel card">
           <div v-if="!image_mode_enabled" class="render-lock-banner">
             <Icon icon="lucide:lock" width="14" />
-            图片模式未开启，渲染器扩展已自动禁用；可在「配置中心 → 图片渲染」中启用
+            {{ t('extensions.render_lock_banner') }}
           </div>
 
           <div class="render-row">
             <div class="render-meta">
-              <h3 class="card-title">渲染引擎</h3>
-              <p class="render-desc">选择用于 HTML→图片的渲染实现，切换后需重启生效</p>
+              <h3 class="card-title">{{ t('extensions.renderer_section_title') }}</h3>
+              <p class="render-desc">{{ t('extensions.renderer_section_desc') }}</p>
             </div>
             <div v-if="renderer_loading" class="render-loading"><Spinner :size="16" /></div>
             <Select
@@ -504,8 +521,8 @@ async function open_studio_log() {
 
           <div class="render-row">
             <div class="render-meta">
-              <h3 class="card-title">模板</h3>
-              <p class="render-desc">选择图片渲染模板包，切换后立即生效</p>
+              <h3 class="card-title">{{ t('extensions.template_section_title') }}</h3>
+              <p class="render-desc">{{ t('extensions.template_section_desc') }}</p>
             </div>
             <div v-if="template_loading" class="render-loading"><Spinner :size="16" /></div>
             <Select
@@ -519,12 +536,12 @@ async function open_studio_log() {
 
           <div class="render-row render-row--list">
             <div class="render-meta">
-              <h3 class="card-title">渲染插件配置</h3>
-              <p class="render-desc">渲染器与模板扩展的配置项；图片模式未开启时渲染器自动禁用</p>
+              <h3 class="card-title">{{ t('extensions.render_plugin_config_title') }}</h3>
+              <p class="render-desc">{{ t('extensions.render_plugin_config_desc') }}</p>
             </div>
           </div>
           <div v-if="render_config_loading" class="render-config-loading">
-            <Spinner :size="16" /> 加载配置中…
+            <Spinner :size="16" /> {{ t('extensions.render_config_loading') }}
           </div>
           <div v-else class="render-configs">
             <div
@@ -544,18 +561,26 @@ async function open_studio_log() {
                   <span class="render-config-name">{{ item.name }}</span>
                   <Badge variant="neutral">
                     <Icon icon="lucide:boxes" width="11" />
-                    {{ item.kind === 'renderer' ? '渲染器' : '模板' }}
+                    {{
+                      item.kind === 'renderer'
+                        ? t('extensions.renderer_kind_badge')
+                        : t('extensions.template_kind_badge')
+                    }}
                   </Badge>
                   <Badge :variant="item.available ? 'success' : 'neutral'">
                     <Icon
                       :icon="item.available ? 'lucide:circle-check' : 'lucide:circle-off'"
                       width="11"
                     />
-                    {{ item.available ? '可用' : '已禁用' }}
+                    {{
+                      item.available
+                        ? t('extensions.renderer_status_available')
+                        : t('extensions.renderer_status_unavailable')
+                    }}
                   </Badge>
                   <Badge v-if="item.current" variant="accent">
                     <Icon icon="lucide:star" width="11" />
-                    当前
+                    {{ t('extensions.render_current_badge') }}
                   </Badge>
                 </div>
                 <span v-if="!item.available && item.reason" class="renderer-item-reason">
@@ -571,7 +596,7 @@ async function open_studio_log() {
               />
             </div>
             <div v-if="!visible_render_configs.length" class="render-config-empty">
-              暂无渲染插件
+              {{ t('extensions.render_plugin_empty') }}
             </div>
           </div>
         </div>
@@ -590,39 +615,36 @@ async function open_studio_log() {
 
     <Dialog
       v-model="studio_intro_open"
-      title="创意工坊"
-      description="首次使用需要先下载组件，请先了解该功能"
-      confirm-text="下载并启动"
+      :title="t('extensions.studio_intro_dialog_title')"
+      :description="t('extensions.studio_intro_dialog_description')"
+      :confirm-text="t('extensions.studio_intro_confirm')"
       :loading="studio_launching"
       @confirm="confirm_studio_launch"
     >
       <div class="studio-intro">
-        <p>
-          创意工坊（Extension Studio）是内置的 AI
-          开发扩展平台，可以通过对话从零创建、调试并安装你自己的扩展：
-        </p>
+        <p>{{ t('extensions.studio_intro_body') }}</p>
         <ul>
-          <li>根据需求，结合已安装插件/模组，设计一套最适合的方案</li>
-          <li>AI 自主测试并修复，确保装上即可用</li>
-          <li>一键打包并安装到机器人，重启后生效</li>
+          <li>{{ t('extensions.studio_intro_feature_design') }}</li>
+          <li>{{ t('extensions.studio_intro_feature_testing') }}</li>
+          <li>{{ t('extensions.studio_intro_feature_package') }}</li>
         </ul>
-        <p>首次启动需要联网下载组件，可能需要一些时间。是否现在下载？</p>
+        <p>{{ t('extensions.studio_intro_download_prompt') }}</p>
       </div>
     </Dialog>
 
     <Dialog
       v-model="studio_log_open"
-      title="Extension Studio 日志"
-      description="Studio 进程输出（stdout / stderr）"
+      :title="t('extensions.studio_log_dialog_title')"
+      :description="t('extensions.studio_log_dialog_description')"
       :hide-footer="true"
       width="min(720px, calc(100vw - 32px))"
     >
       <div class="studio-log-box">
         <div v-if="studio_log_loading" class="studio-log-loading">
-          <Spinner :size="16" /> 加载日志中…
+          <Spinner :size="16" /> {{ t('extensions.studio_log_loading') }}
         </div>
         <pre v-else-if="studio_log" class="studio-log-content">{{ studio_log }}</pre>
-        <div v-else class="studio-log-empty">暂无日志</div>
+        <div v-else class="studio-log-empty">{{ t('extensions.studio_log_empty') }}</div>
       </div>
     </Dialog>
   </div>

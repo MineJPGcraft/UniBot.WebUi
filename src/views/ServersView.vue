@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useServerStore } from '@/stores/server'
@@ -16,6 +17,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { server_type_icon, server_type_label } from '@/utils/server'
 
 const router = useRouter()
+const { t } = useI18n()
 const server_store = useServerStore()
 const auth_store = useAuthStore()
 const toast = use_toast()
@@ -23,6 +25,12 @@ const { run } = use_async_action()
 const { server_list, loading } = storeToRefs(server_store)
 
 const online_count = computed(() => server_list.value.filter((server) => server.online).length)
+const page_summary = computed(() =>
+  t('servers.servers_page_description', {
+    total: server_list.value.length,
+    online: online_count.value,
+  }),
+)
 
 const broadcast_open = ref(false)
 const broadcast_message = ref('')
@@ -33,21 +41,21 @@ onMounted(() => {
 })
 
 async function refresh() {
-  await run(() => server_store.fetch_server_list(), '获取服务器列表失败')
+  await run(() => server_store.fetch_server_list(), t('servers.servers_fetch_list_failed'))
 }
 
 async function submit_broadcast() {
   if (!broadcast_message.value.trim()) {
-    toast.error('请输入广播消息')
+    toast.error(t('servers.servers_broadcast_empty'))
     return
   }
   const ok = await run(
     () => server_store.broadcast_message(broadcast_message.value.trim()),
-    '广播失败',
+    t('servers.servers_broadcast_failed'),
     broadcasting,
   )
   if (ok) {
-    toast.success('广播已发送')
+    toast.success(t('servers.servers_broadcast_success'))
     broadcast_message.value = ''
     broadcast_open.value = false
   }
@@ -58,13 +66,13 @@ async function submit_broadcast() {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">服务器管理</h1>
-        <p class="page-desc">共 {{ server_list.length }} 台服务器 · {{ online_count }} 台在线</p>
+        <h1 class="page-title">{{ t('servers.servers_page_title') }}</h1>
+        <p class="page-desc">{{ page_summary }}</p>
       </div>
       <div class="page-actions">
         <Button v-if="auth_store.is_operator" variant="secondary" @click="broadcast_open = true">
           <Icon icon="lucide:megaphone" width="15" />
-          广播消息
+          {{ t('servers.servers_broadcast_button') }}
         </Button>
         <Button variant="secondary" icon-only @click="refresh">
           <Icon icon="lucide:refresh-cw" width="15" />
@@ -73,14 +81,14 @@ async function submit_broadcast() {
     </div>
 
     <div v-if="loading && server_list.length === 0" class="card">
-      <div class="loading-block"><Spinner :size="18" /> 加载中…</div>
+      <div class="loading-block"><Spinner :size="18" /> {{ t('common.loading') }}</div>
     </div>
 
     <div v-else-if="server_list.length === 0" class="card">
       <EmptyState
         icon="lucide:server-off"
-        title="暂无服务器"
-        description="尚未有 Minecraft 服务器连接到机器人，请在后端配置 MINECRAFT_WS_URLS"
+        :title="t('servers.servers_empty_title')"
+        :description="t('servers.servers_empty_description')"
       />
     </div>
 
@@ -106,11 +114,11 @@ async function submit_broadcast() {
             <h3>{{ server.name }}</h3>
           </div>
           <Badge :variant="server.online ? 'success' : 'neutral'">
-            {{ server.online ? '在线' : '离线' }}
+            {{ server.online ? t('common.online') : t('common.offline') }}
           </Badge>
         </div>
 
-        <p class="server-card-motd">{{ server.motd || '暂无 MOTD' }}</p>
+        <p class="server-card-motd">{{ server.motd || t('servers.servers_no_motd') }}</p>
 
         <div class="server-card-stats">
           <div class="server-stat">
@@ -127,7 +135,9 @@ async function submit_broadcast() {
           </div>
           <div class="server-stat">
             <Icon icon="lucide:hard-drive" width="14" />
-            <span>内存 {{ server.memory_percent ?? '—' }}%</span>
+            <span>{{
+              t('servers.servers_memory_percent', { percent: server.memory_percent ?? '—' })
+            }}</span>
           </div>
         </div>
       </article>
@@ -135,17 +145,17 @@ async function submit_broadcast() {
 
     <Dialog
       v-model="broadcast_open"
-      title="广播消息"
-      description="向所有在线服务器发送一条广播消息"
-      confirm-text="发送"
+      :title="t('servers.servers_broadcast_dialog_title')"
+      :description="t('servers.servers_broadcast_dialog_description')"
+      :confirm-text="t('servers.servers_broadcast_send')"
       :loading="broadcasting"
       @confirm="submit_broadcast"
     >
       <div class="form-row">
-        <label class="form-label">消息内容</label>
+        <label class="form-label">{{ t('servers.servers_broadcast_message_label') }}</label>
         <Textarea
           v-model="broadcast_message"
-          placeholder="如：服务器将于 10 分钟后重启"
+          :placeholder="t('servers.servers_broadcast_message_placeholder')"
           :rows="4"
         />
       </div>

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { usePlayerStore } from '@/stores/player'
@@ -16,6 +17,7 @@ import PlayerHead from '@/components/PlayerHead.vue'
 
 const player_store = usePlayerStore()
 const auth_store = useAuthStore()
+const { t } = useI18n()
 const toast = use_toast()
 const { run } = use_async_action()
 const { binding_list, total, page, page_size, keyword, loading } = storeToRefs(player_store)
@@ -36,7 +38,7 @@ onMounted(() => {
 })
 
 async function refresh() {
-  await run(() => player_store.fetch_bindings(), '获取绑定列表失败')
+  await run(() => player_store.fetch_bindings(), t('players.fetch_failed'))
 }
 
 function handle_search() {
@@ -52,16 +54,16 @@ function handle_page_change(target_page) {
 async function submit_bind() {
   const { user, player } = bind_form.value
   if (!user.trim() || !player.trim()) {
-    toast.error('请填写 QQ 号和游戏 ID')
+    toast.error(t('players.bind_missing_fields'))
     return
   }
   const ok = await run(
     () => player_store.bind_player(user.trim(), player.trim()),
-    '绑定失败',
+    t('players.bind_failed'),
     binding,
   )
   if (ok) {
-    toast.success('绑定成功')
+    toast.success(t('players.bind_success'))
     bind_form.value = { user: '', player: '' }
     bind_open.value = false
   }
@@ -75,11 +77,11 @@ async function submit_unbind() {
   if (!unbind_target.value) return
   const ok = await run(
     () => player_store.unbind_player(unbind_target.value.user, unbind_target.value.player),
-    '解绑失败',
+    t('players.unbind_failed'),
     unbinding,
   )
   if (ok) {
-    toast.success('已解除绑定')
+    toast.success(t('players.unbind_success'))
     unbind_target.value = null
   }
 }
@@ -89,13 +91,13 @@ async function submit_unbind() {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">玩家绑定</h1>
-        <p class="page-desc">管理 QQ 用户与游戏 ID 的绑定关系</p>
+        <h1 class="page-title">{{ t('players.page_title') }}</h1>
+        <p class="page-desc">{{ t('players.page_description') }}</p>
       </div>
       <div class="page-actions">
         <Button v-if="auth_store.is_operator" variant="primary" @click="bind_open = true">
           <Icon icon="lucide:link" width="15" />
-          新增绑定
+          {{ t('players.add_binding') }}
         </Button>
       </div>
     </div>
@@ -106,7 +108,7 @@ async function submit_unbind() {
           <Icon icon="lucide:search" width="15" class="search-icon" />
           <Input
             v-model="search_text"
-            placeholder="搜索 QQ 号或游戏 ID…"
+            :placeholder="t('players.search_placeholder')"
             @keydown.enter="handle_search"
           />
         </form>
@@ -116,23 +118,27 @@ async function submit_unbind() {
       </div>
 
       <div v-if="loading && binding_list.length === 0" class="loading-block">
-        <Spinner :size="18" /> 加载中…
+        <Spinner :size="18" /> {{ t('common.loading') }}
       </div>
 
       <EmptyState
         v-else-if="binding_list.length === 0"
         icon="lucide:users"
-        title="暂无绑定记录"
-        :description="keyword ? `没有匹配 “${keyword}” 的记录` : '还没有用户绑定游戏 ID'"
+        :title="t('players.empty_title')"
+        :description="
+          keyword ? t('players.empty_search_result', { keyword }) : t('players.empty_default')
+        "
       />
 
       <table v-else class="ui-table">
         <thead>
           <tr>
-            <th>QQ 用户</th>
-            <th>绑定的游戏 ID</th>
-            <th>绑定时间</th>
-            <th v-if="auth_store.is_operator" class="col-actions">操作</th>
+            <th>{{ t('players.column_user') }}</th>
+            <th>{{ t('players.column_players') }}</th>
+            <th>{{ t('players.column_time') }}</th>
+            <th v-if="auth_store.is_operator" class="col-actions">
+              {{ t('players.column_actions') }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -148,7 +154,7 @@ async function submit_unbind() {
                   <button
                     v-if="auth_store.is_operator"
                     class="tag-remove"
-                    title="解除绑定"
+                    :title="t('players.unbind_tooltip')"
                     @click="confirm_unbind(binding.user, player)"
                   >
                     <Icon icon="lucide:x" width="11" />
@@ -164,7 +170,7 @@ async function submit_unbind() {
                 class="text-danger"
                 @click="confirm_unbind(binding.user, binding.players[0])"
               >
-                解绑
+                {{ t('players.unbind_action') }}
               </Button>
             </td>
           </tr>
@@ -184,28 +190,33 @@ async function submit_unbind() {
     <!-- 新增绑定 -->
     <Dialog
       v-model="bind_open"
-      title="新增绑定"
-      description="将 QQ 用户与游戏 ID 关联起来"
-      confirm-text="绑定"
+      :title="t('players.add_dialog_title')"
+      :description="t('players.add_dialog_description')"
+      :confirm-text="t('players.bind_confirm')"
       :loading="binding"
       @confirm="submit_bind"
     >
       <div class="form-row">
-        <label class="form-label">QQ 号</label>
-        <Input v-model="bind_form.user" placeholder="如 123456789" />
+        <label class="form-label">{{ t('players.field_user_label') }}</label>
+        <Input v-model="bind_form.user" :placeholder="t('players.user_placeholder')" />
       </div>
       <div class="form-row">
-        <label class="form-label">游戏 ID</label>
-        <Input v-model="bind_form.player" placeholder="如 Steve" />
+        <label class="form-label">{{ t('players.field_player_label') }}</label>
+        <Input v-model="bind_form.player" :placeholder="t('players.player_placeholder')" />
       </div>
     </Dialog>
 
     <!-- 解绑确认 -->
     <Dialog
       :model-value="Boolean(unbind_target)"
-      title="解除绑定"
-      :description="`确定要解除 ${unbind_target?.user} 与 ${unbind_target?.player} 的绑定吗？`"
-      confirm-text="解除"
+      :title="t('players.unbind_dialog_title')"
+      :description="
+        t('players.unbind_confirm_description', {
+          user: unbind_target?.user,
+          player: unbind_target?.player,
+        })
+      "
+      :confirm-text="t('players.unbind_confirm')"
       confirm-variant="danger"
       :loading="unbinding"
       @update:model-value="(open) => !open && (unbind_target = null)"

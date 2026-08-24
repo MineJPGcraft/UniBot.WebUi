@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useExtensionStore } from '@/stores/extension'
 import { use_toast } from '@/composables/use_toast'
@@ -53,6 +54,7 @@ const {
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const active_tab = ref(
   ['toml', 'env', 'messages'].includes(route.query.tab) ? route.query.tab : 'toml',
@@ -68,22 +70,32 @@ const json_errors = ref({})
 const platform_item_ids = ref({})
 let platform_item_sequence = 0
 
-const tabs = [
+const tabs = computed(() => [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
-  { value: 'env', label: '环境变量', icon: 'lucide:terminal' },
-  { value: 'messages', label: '消息文本', icon: 'lucide:message-square' },
-]
+  { value: 'env', label: t('config_view.tab_env'), icon: 'lucide:terminal' },
+  { value: 'messages', label: t('config_view.tab_messages'), icon: 'lucide:message-square' },
+])
 
 const groups = computed(() => schema.value?.groups || [])
 
 /** 当前分组对象（含 keys / gated_by 等元信息） */
 const active_group_data = computed(
-  () => groups.value.find((group) => group.name === active_group.value) || { keys: [] },
+  () =>
+    groups.value.find(
+      (group) => group.id === active_group.value || group.name === active_group.value,
+    ) || {
+      keys: [],
+    },
 )
 
 /** 当前环境变量分组对象 */
 const active_env_group_data = computed(
-  () => env_groups.value.find((group) => group.name === active_env_group.value) || { keys: [] },
+  () =>
+    env_groups.value.find(
+      (group) => group.id === active_env_group.value || group.name === active_env_group.value,
+    ) || {
+      keys: [],
+    },
 )
 
 /** 已变更字段 key 集合（Set 查找，避免模板里嵌套 some 的 O(n²) 比较） */
@@ -110,9 +122,9 @@ const active_group_gate_label = computed(() => {
 onMounted(async () => {
   try {
     await config_store.fetch_all()
-    if (groups.value.length > 0) active_group.value = groups.value[0].name
+    if (groups.value.length > 0) active_group.value = groups.value[0].id
   } catch (error) {
-    toast.error(error.message || '获取配置失败')
+    toast.error(error.message || t('config_view.toast_fetch_failed'))
   }
   try {
     await config_store.fetch_env()
@@ -121,15 +133,17 @@ onMounted(async () => {
     const query_group = route.query.group
     let target_group = ''
     if (typeof query_group === 'string') {
+      // 深链携带分组 id（历史链接可能传旧版中文分组名，同样兼容匹配）
       target_group = query_group
     } else if (typeof query_key === 'string') {
       const matched = env_groups.value.find((g) => g.keys.includes(query_key))
-      if (matched) target_group = matched.name
+      if (matched) target_group = matched.id
     }
-    if (target_group && env_groups.value.some((g) => g.name === target_group)) {
+    const group_matches = (group) => group.id === target_group || group.name === target_group
+    if (target_group && env_groups.value.some(group_matches)) {
       active_env_group.value = target_group
     } else if (env_groups.value.length > 0) {
-      active_env_group.value = env_groups.value[0].name
+      active_env_group.value = env_groups.value[0].id
     }
   } catch {
     // 环境变量加载失败不阻塞页面
@@ -249,7 +263,7 @@ function handle_json_update(key, value) {
     handle_env_update(key, JSON.parse(value))
     json_errors.value = { ...json_errors.value, [key]: '' }
   } catch {
-    json_errors.value = { ...json_errors.value, [key]: '请输入有效的 JSON' }
+    json_errors.value = { ...json_errors.value, [key]: t('config_view.toast_invalid_json') }
   }
 }
 
@@ -281,7 +295,9 @@ const image_deps_not_in_market = ref([])
 const image_deps_installing = ref(false)
 
 const image_deps_confirm_text = computed(() =>
-  image_deps_missing.value.length > 0 ? '自动下载并安装' : '知道了',
+  image_deps_missing.value.length > 0
+    ? t('config_view.image_deps_confirm_install')
+    : t('config_view.image_deps_confirm_ok'),
 )
 
 /** 检查图片模式依赖扩展，缺失时弹窗询问是否自动下载，返回是否弹出了对话框 */
@@ -295,7 +311,7 @@ async function prompt_image_deps() {
     image_deps_dialog_open.value = true
     return true
   } catch (error) {
-    toast.error(error.message || '检查图片模式依赖失败')
+    toast.error(error.message || t('config_view.toast_check_image_deps_failed'))
     return false
   }
 }
@@ -308,10 +324,10 @@ async function install_image_deps() {
       await extension_store.install_market(item.id)
     }
     image_deps_dialog_open.value = false
-    toast.success('图片模式依赖扩展已下载，重启后生效')
-    ask_restart('图片模式依赖扩展已下载，需要重启机器人生效，是否立即重启？')
+    toast.success(t('config_view.toast_image_deps_downloaded'))
+    ask_restart(t('config_view.restart_image_deps'))
   } catch (error) {
-    toast.error(error.message || '下载扩展失败')
+    toast.error(error.message || t('config_view.toast_download_extension_failed'))
   } finally {
     image_deps_installing.value = false
   }
@@ -334,27 +350,27 @@ async function confirm_save() {
       (change) => change.key === 'image.mode' && change.new_value === true,
     )
     await config_store.save_changes()
-    toast.success('配置已保存并热更新')
+    toast.success(t('config_view.toast_saved_hot_reload'))
     diff_open.value = false
     if (image_mode_turned_on) {
       const prompted = await prompt_image_deps()
       if (prompted) return // 依赖下载流程内部处理重启提示
     }
     if (changed_keys.some((key) => RESTART_DEPENDENT_KEYS.includes(key))) {
-      ask_restart('WebUI / 图片渲染 / AI 的启停需要重启机器人生效，是否立即重启？')
+      ask_restart(t('config_view.restart_webui_image_ai'))
     }
   } catch (error) {
-    toast.error(error.message || '保存失败')
+    toast.error(error.message || t('config_view.save_failed'))
   }
 }
 
 async function confirm_env_save() {
   try {
     await config_store.save_env_changes()
-    toast.success('环境变量已保存，重启后生效')
+    toast.success(t('config_view.toast_env_saved_needs_restart'))
     env_diff_open.value = false
   } catch (error) {
-    toast.error(error.message || '保存失败')
+    toast.error(error.message || t('config_view.save_failed'))
   }
 }
 
@@ -363,17 +379,19 @@ async function confirm_raw_save() {
     const { saved_toml, saved_env } = await config_store.save_raw()
     if (raw_editor_target.value === 'env') {
       if (saved_env) {
-        toast.success('保存成功，.env 改动需重启机器人生效')
-        ask_restart('.env 与框架相关配置的改动需要重启机器人生效，是否立即重启？')
+        toast.success(t('config_view.toast_raw_env_saved'))
+        ask_restart(t('config_view.restart_env_changed'))
       } else {
-        toast.success('未检测到改动')
+        toast.success(t('config_view.no_changes_detected'))
       }
     } else {
-      toast.success(saved_toml ? '保存成功，Config.toml 已热更新' : '未检测到改动')
+      toast.success(
+        saved_toml ? t('config_view.toast_raw_toml_saved') : t('config_view.no_changes_detected'),
+      )
     }
     raw_editor_open.value = false
   } catch (error) {
-    toast.error(error.message || '保存失败')
+    toast.error(error.message || t('config_view.save_failed'))
   }
 }
 
@@ -408,7 +426,7 @@ async function open_raw_editor(target) {
       await config_store.fetch_raw()
     } catch (error) {
       raw_loaded.value = false
-      toast.error(error.message || '加载配置文件失败')
+      toast.error(error.message || t('config_view.toast_load_raw_failed'))
     }
   }
 }
@@ -423,7 +441,7 @@ async function ensure_messages() {
     await config_store.fetch_messages()
   } catch (error) {
     messages_loaded.value = false
-    toast.error(error.message || '加载消息文本失败')
+    toast.error(error.message || t('config_view.toast_load_messages_failed'))
   }
 }
 
@@ -434,9 +452,11 @@ function reset_messages() {
 async function confirm_messages_save() {
   try {
     const saved = await config_store.save_messages()
-    toast.success(saved ? '消息文本已保存并生效' : '未检测到改动')
+    toast.success(
+      saved ? t('config_view.toast_messages_saved') : t('config_view.no_changes_detected'),
+    )
   } catch (error) {
-    toast.error(error.message || '保存失败')
+    toast.error(error.message || t('config_view.save_failed'))
   }
 }
 </script>
@@ -445,8 +465,8 @@ async function confirm_messages_save() {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">配置中心</h1>
-        <p class="page-desc">管理 Config.toml 与环境变量</p>
+        <h1 class="page-title">{{ t('config_view.page_title') }}</h1>
+        <p class="page-desc">{{ t('config_view.page_desc') }}</p>
       </div>
     </div>
 
@@ -456,30 +476,32 @@ async function confirm_messages_save() {
         <div class="tab-actions">
           <Button class="tab-action-left" variant="secondary" @click="open_raw_editor('toml')">
             <Icon icon="lucide:file-code" width="15" />
-            编辑源代码
+            {{ t('config_view.edit_source') }}
           </Button>
           <Button variant="ghost" :disabled="!has_changes" @click="config_store.reset_draft()">
-            撤销修改
+            {{ t('config_view.revert_changes') }}
           </Button>
           <Button variant="primary" :disabled="!has_changes" @click="diff_open = true">
             <Icon icon="lucide:save" width="15" />
-            保存修改
+            {{ t('config_view.save_changes') }}
             <span v-if="has_changes" class="change-count">{{ changes.length }}</span>
           </Button>
         </div>
 
         <div v-if="loading && !draft" class="card">
-          <div class="loading-block"><Spinner :size="18" /> 加载配置中…</div>
+          <div class="loading-block">
+            <Spinner :size="18" /> {{ t('config_view.tab_basic_loading') }}
+          </div>
         </div>
 
         <div v-else class="config-layout">
           <nav class="group-nav card">
             <button
               v-for="group in groups"
-              :key="group.name"
+              :key="group.id || group.name"
               class="group-item"
-              :class="{ 'group-item--active': active_group === group.name }"
-              @click="active_group = group.name"
+              :class="{ 'group-item--active': active_group === group.id }"
+              @click="active_group = group.id"
             >
               {{ group.name }}
               <span v-if="has_any_change(group, changed_keys)" class="group-dot" />
@@ -519,7 +541,7 @@ async function confirm_messages_save() {
                     v-else-if="field.type === 'secret'"
                     type="password"
                     :model-value="draft_value(field.key) ?? ''"
-                    placeholder="留空则不修改"
+                    :placeholder="t('config_view.leave_empty_hint')"
                     @update:model-value="(value) => handle_update(field.key, value)"
                   />
                   <Input
@@ -554,7 +576,7 @@ async function confirm_messages_save() {
                     </div>
                     <Button variant="secondary" size="sm" @click="add_list_item(field.key)">
                       <Icon icon="lucide:plus" width="13" />
-                      添加一项
+                      {{ t('config_view.add_item') }}
                     </Button>
                   </div>
                   <div v-else-if="field.type === 'platform_list'" class="list-editor">
@@ -572,7 +594,7 @@ async function confirm_messages_save() {
                       />
                       <Input
                         :model-value="split_platform_item(item).target"
-                        placeholder="群组 / 频道 ID"
+                        :placeholder="t('config_view.tab_basic_platform_target_placeholder')"
                         @update:model-value="
                           (value) => update_platform_item(field, index, 'target', value)
                         "
@@ -588,7 +610,7 @@ async function confirm_messages_save() {
                     </div>
                     <Button variant="secondary" size="sm" @click="add_platform_item(field)">
                       <Icon icon="lucide:plus" width="13" />
-                      添加群组
+                      {{ t('config_view.tab_basic_platform_add_group') }}
                     </Button>
                   </div>
                   <Input
@@ -600,7 +622,9 @@ async function confirm_messages_save() {
               </div>
               <div v-if="active_group_locked" class="field-lock-overlay" role="presentation">
                 <Icon icon="lucide:lock" width="18" />
-                <p class="field-lock-text">请先开启「{{ active_group_gate_label }}」</p>
+                <p class="field-lock-text">
+                  {{ t('config_view.tab_basic_lock_hint', { name: active_group_gate_label }) }}
+                </p>
               </div>
             </div>
           </section>
@@ -612,34 +636,36 @@ async function confirm_messages_save() {
         <div class="tab-actions">
           <Button class="tab-action-left" variant="secondary" @click="open_raw_editor('env')">
             <Icon icon="lucide:file-code" width="15" />
-            编辑源代码
+            {{ t('config_view.edit_source') }}
           </Button>
           <Button
             variant="ghost"
             :disabled="!has_env_changes"
             @click="config_store.reset_env_draft()"
           >
-            撤销修改
+            {{ t('config_view.revert_changes') }}
           </Button>
           <Button variant="primary" :disabled="!has_env_changes" @click="env_diff_open = true">
             <Icon icon="lucide:save" width="15" />
-            保存修改
+            {{ t('config_view.save_changes') }}
             <span v-if="has_env_changes" class="change-count">{{ env_changes.length }}</span>
           </Button>
         </div>
 
         <div v-if="env_loading" class="card">
-          <div class="loading-block"><Spinner :size="18" /> 加载环境变量…</div>
+          <div class="loading-block">
+            <Spinner :size="18" /> {{ t('config_view.tab_env_loading') }}
+          </div>
         </div>
 
         <div v-else class="config-layout">
           <nav class="group-nav card">
             <button
               v-for="group in env_groups"
-              :key="group.name"
+              :key="group.id || group.name"
               class="group-item"
-              :class="{ 'group-item--active': active_env_group === group.name }"
-              @click="active_env_group = group.name"
+              :class="{ 'group-item--active': active_env_group === group.id }"
+              @click="active_env_group = group.id"
             >
               {{ group.name }}
               <span v-if="has_any_change(group, env_changed_keys)" class="group-dot" />
@@ -649,7 +675,7 @@ async function confirm_messages_save() {
           <section class="card config-panel">
             <div class="card-header">
               <h3 class="card-title">{{ active_env_group }}</h3>
-              <span class="text-xs text-muted">修改后需重启机器人生效</span>
+              <span class="text-xs text-muted">{{ t('config_view.tab_env_restart_hint') }}</span>
             </div>
             <div class="field-list">
               <div
@@ -676,7 +702,7 @@ async function confirm_messages_save() {
                     v-else-if="field.type === 'secret'"
                     type="password"
                     :model-value="env_draft_value(field.key) ?? ''"
-                    placeholder="留空则不修改"
+                    :placeholder="t('config_view.leave_empty_hint')"
                     @update:model-value="(value) => handle_env_update(field.key, value)"
                   />
                   <Input
@@ -708,7 +734,7 @@ async function confirm_messages_save() {
                     </div>
                     <Button variant="secondary" size="sm" @click="add_env_list_item(field.key)">
                       <Icon icon="lucide:plus" width="13" />
-                      添加一项
+                      {{ t('config_view.add_item') }}
                     </Button>
                   </div>
                   <div v-else-if="field.type === 'json'" class="json-editor">
@@ -745,7 +771,7 @@ async function confirm_messages_save() {
       <template #messages>
         <div class="tab-actions">
           <Button variant="ghost" :disabled="!has_messages_changes" @click="reset_messages">
-            撤销修改
+            {{ t('config_view.revert_changes') }}
           </Button>
           <Button
             variant="primary"
@@ -753,12 +779,14 @@ async function confirm_messages_save() {
             @click="confirm_messages_save"
           >
             <Icon icon="lucide:save" width="15" />
-            保存修改
+            {{ t('config_view.save_changes') }}
           </Button>
         </div>
 
         <div v-if="messages_loading" class="card">
-          <div class="loading-block"><Spinner :size="18" /> 加载消息文本…</div>
+          <div class="loading-block">
+            <Spinner :size="18" /> {{ t('config_view.tab_messages_loading') }}
+          </div>
         </div>
 
         <section v-else class="card message-editor">
@@ -771,20 +799,28 @@ async function confirm_messages_save() {
                 <div>
                   <h3 class="card-title">Messages.toml</h3>
                   <p class="message-editor-sub">
-                    编辑机器人回复文本，支持
-                    <code class="mono message-code">{占位符}</code>，保存后立即生效
+                    {{ t('config_view.tab_messages_sub_prefix') }}
+                    <code class="mono message-code">{{
+                      t('config_view.tab_messages_placeholder_example')
+                    }}</code>
+                    {{ t('config_view.tab_messages_sub_suffix') }}
                   </p>
                 </div>
               </div>
             </div>
             <span v-if="!messages_loading" class="message-editor-meta">
-              {{ messages_line_count }} 行 · {{ messages_char_count }} 字符
+              {{
+                t('config_view.tab_messages_stats', {
+                  line_count: messages_line_count,
+                  char_count: messages_char_count,
+                })
+              }}
             </span>
           </div>
           <div class="message-editor-body">
             <div v-if="messages_toml === ''" class="raw-loading">
               <Spinner />
-              <span>正在加载消息配置…</span>
+              <span>{{ t('config_view.tab_messages_loading_body') }}</span>
             </div>
             <CodeEditor
               v-else
@@ -796,17 +832,17 @@ async function confirm_messages_save() {
           <div class="message-editor-footer">
             <div class="message-editor-hint">
               <Icon icon="lucide:info" width="13" />
-              使用
+              {{ t('config_view.tab_messages_hint_prefix') }}
               <code class="mono message-code">{name}</code>
-              形式的占位符引用玩家名 / 数值等动态内容
+              {{ t('config_view.tab_messages_hint_suffix') }}
             </div>
             <span v-if="has_messages_changes" class="raw-changed">
               <Icon icon="lucide:circle-alert" width="13" />
-              有未保存的修改
+              {{ t('config_view.changed_tip') }}
             </span>
             <span v-else class="raw-saved-tip">
               <Icon icon="lucide:check-circle" width="13" />
-              已是最新内容
+              {{ t('config_view.unchanged_tip') }}
             </span>
           </div>
         </section>
@@ -816,20 +852,24 @@ async function confirm_messages_save() {
     <!-- 源码编辑弹窗：按当前 tab 编辑对应文件的原始文本 -->
     <Dialog
       v-model="raw_editor_open"
-      :title="raw_editor_target === 'env' ? '编辑 .env 源代码' : '编辑 Config.toml 源代码'"
+      :title="
+        raw_editor_target === 'env'
+          ? t('config_view.tab_raw_title_env')
+          : t('config_view.tab_raw_title_toml')
+      "
       :description="
         raw_editor_target === 'env'
-          ? '直接编辑 .env 源码，改动需重启机器人生效；请谨慎修改，错误的语法会导致配置无法加载。'
-          : '直接编辑 Config.toml 源码，保存后立即热更新；请谨慎修改，错误的语法会导致配置无法加载。'
+          ? t('config_view.tab_raw_desc_env')
+          : t('config_view.tab_raw_desc_toml')
       "
-      confirm-text="保存修改"
+      :confirm-text="t('config_view.save_changes')"
       :loading="raw_saving"
       width="70vw"
       @confirm="confirm_raw_save"
     >
       <div v-if="raw_loading" class="raw-loading">
         <Spinner />
-        <span>正在加载配置文件…</span>
+        <span>{{ t('config_view.tab_raw_loading') }}</span>
       </div>
       <template v-else>
         <div class="raw-field">
@@ -852,11 +892,11 @@ async function confirm_messages_save() {
       <div class="raw-actions">
         <span v-if="current_raw_changed" class="raw-changed">
           <Icon icon="lucide:circle-alert" width="13" />
-          有未保存的修改
+          {{ t('config_view.changed_tip') }}
         </span>
         <span v-else class="raw-saved-tip">
           <Icon icon="lucide:check" width="13" />
-          已是最新内容
+          {{ t('config_view.unchanged_tip') }}
         </span>
         <div class="raw-actions-right">
           <Button
@@ -866,7 +906,7 @@ async function confirm_messages_save() {
             @click="reset_raw"
           >
             <Icon icon="lucide:rotate-ccw" width="14" />
-            恢复原内容
+            {{ t('config_view.tab_raw_restore') }}
           </Button>
         </div>
       </div>
@@ -875,8 +915,8 @@ async function confirm_messages_save() {
     <!-- Config.toml 保存前 diff 预览 -->
     <DiffPreviewDialog
       :open="diff_open"
-      title="确认修改"
-      :description="`共 ${changes.length} 项配置将被更新`"
+      :title="t('config_view.diff_toml_title')"
+      :description="t('config_view.diff_toml_desc', { count: changes.length })"
       :changes="changes"
       :loading="saving"
       @update:open="(value) => (diff_open = value)"
@@ -886,8 +926,8 @@ async function confirm_messages_save() {
     <!-- .env 保存前 diff 预览 -->
     <DiffPreviewDialog
       :open="env_diff_open"
-      title="确认修改环境变量"
-      :description="`共 ${env_changes.length} 项环境变量将被更新，保存后需重启机器人`"
+      :title="t('config_view.diff_env_title')"
+      :description="t('config_view.diff_env_desc', { count: env_changes.length })"
       :changes="env_changes"
       :loading="env_saving"
       @update:open="(value) => (env_diff_open = value)"
@@ -897,10 +937,10 @@ async function confirm_messages_save() {
     <!-- 图片模式依赖扩展自动下载引导 -->
     <Dialog
       v-model="image_deps_dialog_open"
-      title="安装图片模式依赖扩展"
-      description="图片模式需要渲染引擎与模板包，以下扩展尚未下载"
+      :title="t('config_view.image_deps_title')"
+      :description="t('config_view.image_deps_desc')"
       :confirm-text="image_deps_confirm_text"
-      cancel-text="稍后再说"
+      :cancel-text="t('config_view.image_deps_cancel_later')"
       :loading="image_deps_installing"
       @confirm="confirm_image_deps"
     >
@@ -913,13 +953,13 @@ async function confirm_messages_save() {
         <div v-if="image_deps_not_in_market.length > 0" class="image-dep-warning">
           <Icon icon="lucide:triangle-alert" width="15" />
           <span>
-            以下扩展不在市场中，无法自动下载，请手动安装：
+            {{ t('config_view.image_deps_not_in_market_warning') }}
             <span
               v-for="item in image_deps_not_in_market"
               :key="item.id"
               class="mono image-dep-inline"
             >
-              {{ item.name }}（{{ item.id }}）
+              {{ t('config_view.image_deps_item_with_id', { name: item.name, id: item.id }) }}
             </span>
           </span>
         </div>

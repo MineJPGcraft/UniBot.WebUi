@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useLogStore } from '@/stores/log'
@@ -16,6 +17,7 @@ import { ansi_to_html } from '@/utils/ansi'
 
 const log_store = useLogStore()
 const { run } = use_async_action()
+const { t } = useI18n()
 const {
   file_list,
   current_file,
@@ -35,14 +37,14 @@ const keyword_input = ref('')
 const auto_scroll = ref(true)
 const live_container = ref(null)
 
-const level_options = [
-  { value: 'all', label: '全部级别' },
+const level_options = computed(() => [
+  { value: 'all', label: t('logs.level_all') },
   { value: 'DEBUG', label: 'DEBUG' },
   { value: 'INFO', label: 'INFO' },
   { value: 'SUCCESS', label: 'SUCCESS' },
   { value: 'WARNING', label: 'WARNING' },
   { value: 'ERROR', label: 'ERROR' },
-]
+])
 
 const live_level_filter = ref('all')
 const filtered_live_logs = computed(() => {
@@ -79,13 +81,13 @@ onMounted(async () => {
       log_store.select_file(file_list.value[0].name)
       await log_store.fetch_content()
     }
-  }, '获取日志失败')
+  }, t('logs.fetch_failed'))
 })
 
 async function select_file(name) {
   log_store.select_file(name)
   keyword_input.value = ''
-  await run(() => log_store.fetch_content(), '读取日志失败')
+  await run(() => log_store.fetch_content(), t('logs.read_failed'))
 }
 
 // 过滤与分页均为客户端计算（store 的 filtered_lines/log_items），
@@ -107,8 +109,8 @@ function handle_page_change(target_page) {
   <div class="page">
     <div class="page-header">
       <div>
-        <h1 class="page-title">日志查看器</h1>
-        <p class="page-desc">浏览历史日志文件，或跟踪实时日志流</p>
+        <h1 class="page-title">{{ t('logs.page_title') }}</h1>
+        <p class="page-desc">{{ t('logs.page_description') }}</p>
       </div>
       <div class="page-actions">
         <div class="tab-switch">
@@ -118,7 +120,7 @@ function handle_page_change(target_page) {
             @click="active_tab = 'history'"
           >
             <Icon icon="lucide:file-text" width="14" />
-            历史日志
+            {{ t('logs.tab_history') }}
           </button>
           <button
             class="tab-item"
@@ -126,7 +128,7 @@ function handle_page_change(target_page) {
             @click="active_tab = 'realtime'"
           >
             <Icon icon="lucide:radio" width="14" />
-            实时日志
+            {{ t('logs.tab_realtime') }}
             <span class="live-dot" />
           </button>
         </div>
@@ -137,7 +139,7 @@ function handle_page_change(target_page) {
     <div v-if="active_tab === 'history'" class="log-layout">
       <aside class="file-panel card">
         <div class="card-header">
-          <h3 class="card-title">日志文件</h3>
+          <h3 class="card-title">{{ t('logs.files_card_title') }}</h3>
           <Button variant="ghost" size="sm" icon-only @click="log_store.fetch_file_list()">
             <Icon icon="lucide:refresh-cw" width="13" />
           </Button>
@@ -158,7 +160,7 @@ function handle_page_change(target_page) {
               </span>
             </div>
           </li>
-          <li v-if="file_list.length === 0" class="file-empty">暂无日志文件</li>
+          <li v-if="file_list.length === 0" class="file-empty">{{ t('logs.files_empty') }}</li>
         </ul>
       </aside>
 
@@ -172,20 +174,24 @@ function handle_page_change(target_page) {
           <form class="keyword-box" @submit.prevent="apply_keyword">
             <Input
               v-model="keyword_input"
-              placeholder="按关键词过滤…"
+              :placeholder="t('logs.keyword_placeholder')"
               @keydown.enter="apply_keyword"
             />
-            <Button variant="secondary" size="sm" type="submit">过滤</Button>
+            <Button variant="secondary" size="sm" type="submit">{{
+              t('logs.filter_action')
+            }}</Button>
           </form>
-          <span class="text-xs text-muted">共 {{ total }} 行</span>
+          <span class="text-xs text-muted">{{ t('logs.total_lines', { count: total }) }}</span>
         </div>
 
         <div v-if="!current_file" class="content-empty">
-          <EmptyState icon="lucide:file-text" title="请选择左侧日志文件" />
+          <EmptyState icon="lucide:file-text" :title="t('logs.select_file_hint')" />
         </div>
-        <div v-else-if="loading" class="loading-block"><Spinner :size="18" /> 加载中…</div>
+        <div v-else-if="loading" class="loading-block">
+          <Spinner :size="18" /> {{ t('common.loading') }}
+        </div>
         <div v-else-if="log_items.length === 0" class="content-empty">
-          <EmptyState icon="lucide:search-x" title="没有匹配的日志行" />
+          <EmptyState icon="lucide:search-x" :title="t('logs.no_matching_lines')" />
         </div>
         <div v-else class="log-content">
           <div v-for="item in log_items" :key="item.line" class="log-line">
@@ -220,13 +226,19 @@ function handle_page_change(target_page) {
           @click="auto_scroll = !auto_scroll"
         >
           <Icon icon="lucide:arrow-down-to-line" width="13" />
-          自动滚动 {{ auto_scroll ? '开' : '关' }}
+          {{ auto_scroll ? t('logs.auto_scroll_on') : t('logs.auto_scroll_off') }}
         </button>
-        <Button variant="ghost" size="sm" @click="log_store.clear_live()">清空</Button>
-        <span class="text-xs text-muted">已接收 {{ live_logs.length }} 条</span>
+        <Button variant="ghost" size="sm" @click="log_store.clear_live()">{{
+          t('logs.clear_action')
+        }}</Button>
+        <span class="text-xs text-muted">{{
+          t('logs.received_count', { count: live_logs.length })
+        }}</span>
       </div>
       <div ref="live_container" class="live-stream">
-        <div v-if="filtered_live_logs.length === 0" class="live-empty">等待日志推送…</div>
+        <div v-if="filtered_live_logs.length === 0" class="live-empty">
+          {{ t('logs.waiting_for_logs') }}
+        </div>
         <div
           v-for="(log, index) in filtered_live_logs"
           :key="log.seq || `${log.time}-${index}`"

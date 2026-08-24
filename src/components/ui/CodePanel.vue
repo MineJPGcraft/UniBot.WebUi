@@ -1,7 +1,10 @@
 <script setup>
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { use_toast } from '@/composables/use_toast'
 import CodeEditor from './CodeEditor.vue'
+
+const { t } = useI18n()
 
 const props = defineProps({
   /** 面板标题，展示在头部左侧 */
@@ -17,9 +20,9 @@ const toast = use_toast()
 async function copy_code() {
   try {
     await navigator.clipboard.writeText(props.code)
-    toast.success('已复制到剪贴板')
+    toast.success(t('common.copy_success'))
   } catch {
-    toast.error('复制失败，请手动选择复制')
+    toast.error(t('common.copy_failed'))
   }
 }
 </script>
@@ -30,7 +33,7 @@ async function copy_code() {
       <span class="ui-code-panel-title">{{ title }}</span>
       <button class="ui-code-panel-copy" type="button" @click="copy_code">
         <Icon icon="lucide:copy" width="13" />
-        复制
+        {{ t('common.copy') }}
       </button>
     </div>
     <CodeEditor

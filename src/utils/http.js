@@ -1,3 +1,5 @@
+import { current_locale, t_global } from '@/i18n'
+
 /**
  * HTTP 请求封装
  * - JWT 通过 HttpOnly cookie 自动携带（无需手动管理 token）
@@ -45,22 +47,23 @@ async function refresh_access_token() {
   try {
     response = await fetch(api_url('/api/auth/refresh'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept-Language': current_locale() },
       credentials: 'include',
       body: '{}',
       signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     })
   } catch {
-    throw new ApiError(0, '网络连接失败，请检查服务是否在线')
+    throw new ApiError(0, t_global('common.network_error'))
   }
-  if (!response.ok) throw new ApiError(response.status, '登录已过期')
+  if (!response.ok) throw new ApiError(response.status, t_global('common.session_expired'))
   const result = await response.json()
-  if (result.code !== 0) throw new ApiError(result.code, result.message || '刷新失败')
+  if (result.code !== 0)
+    throw new ApiError(result.code, result.message || t_global('common.refresh_failed'))
 }
 
 /** 把非 2xx 响应转换为携带 detail 的 ApiError（FastAPI HTTPException 返回 { detail }） */
 async function problem_to_error(response) {
-  let detail = `请求失败：${response.status}`
+  let detail = `${t_global('common.request_failed')}: ${response.status}`
   try {
     const problem = await response.json()
     detail = problem.detail || problem.message || detail
@@ -75,8 +78,8 @@ async function do_fetch(url, options) {
   try {
     return await fetch(url, options)
   } catch (error) {
-    if (error.name === 'TimeoutError') throw new ApiError(0, '请求超时，请检查服务是否在线')
-    throw new ApiError(0, '网络连接失败，请检查服务是否在线')
+    if (error.name === 'TimeoutError') throw new ApiError(0, t_global('common.request_timeout'))
+    throw new ApiError(0, t_global('common.network_error'))
   }
 }
 
@@ -98,7 +101,10 @@ async function request(
     do_fetch(url, {
       method,
       // 无请求体的方法不发送 Content-Type
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+      headers:
+        body !== undefined
+          ? { 'Content-Type': 'application/json', 'Accept-Language': current_locale() }
+          : { 'Accept-Language': current_locale() },
       credentials: 'include',
       signal: AbortSignal.timeout(timeout_ms),
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -123,7 +129,7 @@ async function request(
 
   if (response.status === 401) {
     window.dispatchEvent(new CustomEvent('unibot:unauthorized'))
-    throw new ApiError(401, '登录已过期')
+    throw new ApiError(401, t_global('common.session_expired'))
   }
 
   // 其余协议级错误（400/403/404…）：解析 detail 作为提示
@@ -133,11 +139,11 @@ async function request(
   try {
     result = await response.json()
   } catch {
-    throw new ApiError(response.status, `请求失败：${response.status}`)
+    throw new ApiError(response.status, `${t_global('common.request_failed')}: ${response.status}`)
   }
 
   if (result.code !== 0) {
-    throw new ApiError(result.code, result.message || '请求失败')
+    throw new ApiError(result.code, result.message || t_global('common.request_failed'))
   }
   return result.data
 }
