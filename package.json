@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "check:i18n": "bun scripts/check-i18n.mjs",
     "check:locales": "bun scripts/check-locales.mjs",
     "dev": "vite",
     "format": "oxfmt src/",

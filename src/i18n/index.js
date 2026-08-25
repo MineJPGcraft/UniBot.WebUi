@@ -19,6 +19,7 @@ import adapters from './messages/adapters.json'
 import plugins from './messages/plugins.json'
 import users from './messages/users.json'
 import settings from './messages/settings.json'
+import setup from './messages/setup.json'
 import statistics from './messages/statistics.json'
 import logs from './messages/logs.json'
 import ui from './messages/ui.json'
@@ -45,6 +46,7 @@ const MESSAGE_MODULES = {
   plugins,
   users,
   settings,
+  setup,
   statistics,
   logs,
   ui,
