@@ -66,6 +66,12 @@
   --tooltip-border: var(--border);
   --tooltip-fg: var(--text);
 
+  /* 交互悬浮底色：跟随文字色自动适配双主题（hover 专用，与 --surface-sunken 凹陷底色区分） */
+  --hover: color-mix(in srgb, var(--text) 5%, transparent);
+
+  /* 开关旋钮：深色下用浅灰替代纯白，避免高亮刺眼 */
+  --switch-knob: #ffffff;
+
   /* 布局 */
   --sidebar-width: 216px;
   --topbar-height: 56px;
@@ -87,14 +93,15 @@
 html.dark {
   color-scheme: dark;
 
-  --bg: #17171a;
-  --surface: #202024;
-  --surface-sunken: #29292e;
-  --border: #36363c;
-  --border-strong: #52525b;
-  --text: #f4f4f5;
-  --text-secondary: #d4d4d8;
-  --text-muted: #a1a1aa;
+  /* 冷调中性灰阶：bg → sunken → surface 逐级提亮，sunken 恒比 surface 深（凹陷） */
+  --bg: #15161a;
+  --surface: #202128;
+  --surface-sunken: #1a1b20;
+  --border: #2e2f37;
+  --border-strong: #4a4b56;
+  --text: #e7e7ea;
+  --text-secondary: #c9c9d1;
+  --text-muted: #9b9ba4;
   --accent: #3b82f6;
   --accent-hover: #60a5fa;
   --accent-soft: rgb(59 130 246 / 0.16);
@@ -110,9 +117,11 @@ html.dark {
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
 
-  --tooltip-bg: #34343b;
+  --tooltip-bg: #33343d;
   --tooltip-border: rgb(255 255 255 / 0.1);
-  --tooltip-fg: #f4f4f5;
+  --tooltip-fg: #e7e7ea;
+
+  --switch-knob: #c9c9d1;
 }
 
 /* ---------- Reset ---------- */
@@ -373,7 +382,7 @@ ol {
 }
 
 .ui-table tbody tr:hover {
-  background: var(--surface-sunken);
+  background: var(--hover);
 }
 
 .ui-table tbody tr:last-child td {

@@ -42,7 +42,7 @@ defineProps({
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--switch-knob);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
   transition: transform var(--transition);
 }

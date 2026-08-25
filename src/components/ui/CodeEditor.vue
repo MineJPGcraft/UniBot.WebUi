@@ -45,7 +45,7 @@ const highlight_styles = {
     { tag: [tags.comment, tags.lineComment], color: '#71717a', fontStyle: 'italic' },
   ]),
   dark: HighlightStyle.define([
-    { tag: tags.heading, color: '#f4f4f5', fontWeight: '600' },
+    { tag: tags.heading, color: '#e7e7ea', fontWeight: '600' },
     { tag: tags.keyword, color: '#93c5fd' },
     { tag: [tags.number, tags.bool, tags.null], color: '#fcd34d' },
     { tag: tags.string, color: '#86efac' },

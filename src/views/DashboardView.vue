@@ -325,7 +325,7 @@ onMounted(async () => {
 }
 
 .server-row:hover {
-  background: var(--surface-sunken);
+  background: var(--hover);
 }
 
 .server-dot {

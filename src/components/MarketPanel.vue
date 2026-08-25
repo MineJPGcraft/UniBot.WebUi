@@ -391,7 +391,7 @@ function upgrade(item) {
 }
 
 .market-homepage:hover {
-  background: var(--surface-sunken);
+  background: var(--hover);
   color: var(--text);
 }
 

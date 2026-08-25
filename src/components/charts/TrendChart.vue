@@ -30,12 +30,12 @@ const { is_dark } = storeToRefs(useThemeStore())
 const chart_palette = computed(() =>
   is_dark.value
     ? {
-        text: '#a1a1aa',
-        axis_line: '#52525b',
-        split_line: '#36363c',
-        tooltip_bg: '#29292e',
-        tooltip_border: '#52525b',
-        tooltip_text: '#f4f4f5',
+        text: '#e7e7ea',
+        axis_line: '#4a4b56',
+        split_line: '#2e2f37',
+        tooltip_bg: '#33343d',
+        tooltip_border: '#4a4b56',
+        tooltip_text: '#e7e7ea',
       }
     : {
         text: '#71717a',

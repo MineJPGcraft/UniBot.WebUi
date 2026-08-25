@@ -342,7 +342,7 @@ function handle_page_change(target_page) {
 }
 
 .file-item:hover {
-  background: var(--surface-sunken);
+  background: var(--hover);
 }
 
 .file-item--active {

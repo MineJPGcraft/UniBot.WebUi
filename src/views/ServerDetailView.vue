@@ -378,7 +378,7 @@ function handle_command_keydown(event) {
 }
 
 .player-item:hover {
-  background: var(--surface-sunken);
+  background: var(--hover);
 }
 
 .player-name {

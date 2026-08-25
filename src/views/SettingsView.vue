@@ -628,7 +628,7 @@ async function save_password() {
 }
 
 a.about-link:hover {
-  background: var(--surface-sunken);
+  background: var(--hover);
 }
 
 .about-link-icon {
