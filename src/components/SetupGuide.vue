@@ -254,6 +254,7 @@ onMounted(async () => {
 
 .setup-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
@@ -303,6 +304,23 @@ onMounted(async () => {
 
 .setup-bar {
   width: 120px;
+  max-width: 30vw;
+}
+
+@media (max-width: 900px) {
+  .setup-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .setup-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setup-bar {
+    display: none;
+  }
 }
 
 .setup-collapse {
@@ -326,10 +344,10 @@ onMounted(async () => {
   color: var(--accent);
 }
 
-/* 步骤列表 */
+/* 步骤列表：minmax(0, 1fr) 防止 nowrap 文本把网格轨道撑出容器 */
 .setup-steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
   margin-top: var(--space-4);
   list-style: none;
@@ -340,6 +358,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
