@@ -67,7 +67,7 @@ export function level_class(level) {
     ERROR: 'text-danger',
     WARNING: 'text-warning',
     SUCCESS: 'text-success',
-    INFO: 'text-secondary',
+    INFO: 'text-accent',
     DEBUG: 'text-muted',
   }
   return map[level] || 'text-muted'

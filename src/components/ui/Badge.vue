@@ -25,7 +25,7 @@ defineProps({
 }
 
 .ui-badge--neutral {
-  background: rgb(0 0 0 / 0.05);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   color: var(--text-secondary);
 }
 

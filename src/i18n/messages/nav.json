@@ -18,7 +18,8 @@
     "ws_disconnected": "实时连接断开",
     "user_settings": "个人设置",
     "logout": "退出登录",
-    "switch_language": "切换语言 / Switch language"
+    "switch_language": "切换语言 / Switch language",
+    "toggle_theme": "切换深色 / 浅色模式"
   },
   "en": {
     "login": "Login",
@@ -39,6 +40,7 @@
     "ws_disconnected": "Realtime disconnected",
     "user_settings": "Account Settings",
     "logout": "Sign out",
-    "switch_language": "Switch language / 切换语言"
+    "switch_language": "Switch language / 切换语言",
+    "toggle_theme": "Toggle dark / light mode"
   }
 }

@@ -1012,7 +1012,7 @@ async function confirm_messages_save() {
 }
 
 .group-item:hover {
-  background: rgb(0 0 0 / 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   color: var(--text);
 }
 

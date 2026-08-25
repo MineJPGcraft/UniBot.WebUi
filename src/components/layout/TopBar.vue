@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import { use_websocket } from '@/composables/use_websocket'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
@@ -16,6 +17,8 @@ const route = useRoute()
 const { t } = useI18n()
 const auth_store = useAuthStore()
 const { user } = storeToRefs(auth_store)
+const theme_store = useThemeStore()
+const { is_dark } = storeToRefs(theme_store)
 const { connection_state } = use_websocket()
 
 const breadcrumb = computed(() => t(route.meta.title_key || 'nav.dashboard'))
@@ -79,6 +82,12 @@ function toggle_locale() {
         </button>
       </Tooltip>
 
+      <Tooltip :text="t('nav.toggle_theme')">
+        <button class="theme-toggle" @click="theme_store.toggle_theme()">
+          <Icon :icon="is_dark ? 'lucide:sun' : 'lucide:moon'" width="16" />
+        </button>
+      </Tooltip>
+
       <DropdownMenu :items="user_menu_items">
         <template #trigger>
           <button class="user-trigger">
@@ -130,7 +139,8 @@ function toggle_locale() {
   cursor: default;
 }
 
-.locale-toggle {
+.locale-toggle,
+.theme-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -138,11 +148,14 @@ function toggle_locale() {
   height: 28px;
   border-radius: var(--radius);
   color: var(--text-muted);
-  transition: background-color var(--transition);
+  transition:
+    background-color var(--transition),
+    color var(--transition);
 }
 
-.locale-toggle:hover {
-  background: rgb(0 0 0 / 0.04);
+.locale-toggle:hover,
+.theme-toggle:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   color: var(--text);
 }
 
@@ -176,7 +189,7 @@ function toggle_locale() {
 }
 
 .user-trigger:hover {
-  background: rgb(0 0 0 / 0.04);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 
 .user-avatar {

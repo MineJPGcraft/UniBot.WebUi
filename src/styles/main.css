@@ -4,6 +4,8 @@
    ============================================================ */
 
 :root {
+  color-scheme: light;
+
   /* 色彩 */
   --bg: #f6f7f9;
   --surface: #ffffff;
@@ -73,6 +75,35 @@
 
   /* 动效 */
   --transition: 150ms ease-out;
+}
+
+/* ---------- 深色主题 ---------- */
+
+html.dark {
+  color-scheme: dark;
+
+  --bg: #17171a;
+  --surface: #202024;
+  --surface-sunken: #29292e;
+  --border: #36363c;
+  --border-strong: #52525b;
+  --text: #f4f4f5;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: rgb(59 130 246 / 0.16);
+  --success: #22c55e;
+  --success-soft: rgb(34 197 94 / 0.14);
+  --warning: #f59e0b;
+  --warning-soft: rgb(245 158 11 / 0.15);
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-soft: rgb(239 68 68 / 0.16);
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
 }
 
 /* ---------- Reset ---------- */
@@ -161,6 +192,10 @@ ol {
 
 .text-muted {
   color: var(--text-muted);
+}
+
+.text-accent {
+  color: var(--accent);
 }
 
 .text-secondary {

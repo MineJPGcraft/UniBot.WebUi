@@ -266,7 +266,7 @@ function handle_page_change(target_page) {
   display: inline-flex;
   gap: var(--space-1);
   padding: var(--space-1);
-  background: rgb(0 0 0 / 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }

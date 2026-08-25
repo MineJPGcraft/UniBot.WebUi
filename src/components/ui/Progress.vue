@@ -21,7 +21,7 @@ defineProps({
   position: relative;
   height: 6px;
   border-radius: 999px;
-  background: rgb(0 0 0 / 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
   overflow: hidden;
 }
 

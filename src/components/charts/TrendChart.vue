@@ -1,10 +1,12 @@
 <script setup>
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, LineChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
+import { useThemeStore } from '@/stores/theme'
 
 // 按需注册：柱状/折线 + 网格/图例/提示框 + Canvas 渲染
 use([BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
@@ -22,7 +24,15 @@ const props = defineProps({
   },
 })
 
+const { is_dark } = storeToRefs(useThemeStore())
+
 /** ECharts 用 canvas 渲染，颜色需为字面量，无法解析 CSS 变量 */
+const chart_palette = computed(() =>
+  is_dark.value
+    ? { text: '#a1a1aa', axis_line: '#52525b', split_line: '#36363c' }
+    : { text: '#71717a', axis_line: '#e4e4e7', split_line: '#e4e4e7' },
+)
+
 const chart_option = computed(() => ({
   grid: { left: 44, right: 12, top: 28, bottom: 24 },
   tooltip: {
@@ -36,15 +46,15 @@ const chart_option = computed(() => ({
     icon: 'roundRect',
     itemWidth: 10,
     itemHeight: 10,
-    textStyle: { color: '#71717a', fontSize: 12 },
+    textStyle: { color: chart_palette.value.text, fontSize: 12 },
   },
   xAxis: {
     type: 'category',
     data: props.items.map((item) => item.label),
     axisTick: { show: false },
-    axisLine: { lineStyle: { color: '#e4e4e7' } },
+    axisLine: { lineStyle: { color: chart_palette.value.axis_line } },
     axisLabel: {
-      color: '#71717a',
+      color: chart_palette.value.text,
       fontSize: 10,
       // 标签格式化为 MM-DD，并抽样避免重叠
       formatter: (value) => value.slice(5),
@@ -53,8 +63,8 @@ const chart_option = computed(() => ({
   },
   yAxis: {
     type: 'value',
-    splitLine: { lineStyle: { color: '#e4e4e7' } },
-    axisLabel: { color: '#71717a', fontSize: 10 },
+    splitLine: { lineStyle: { color: chart_palette.value.split_line } },
+    axisLabel: { color: chart_palette.value.text, fontSize: 10 },
   },
   series: props.series.map((serie) => ({
     name: serie.name,

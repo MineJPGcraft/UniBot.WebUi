@@ -3,10 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { StreamLanguage } from '@codemirror/language'
+import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import { toml } from '@codemirror/legacy-modes/mode/toml'
 import { properties } from '@codemirror/legacy-modes/mode/properties'
 import { yaml } from '@codemirror/legacy-modes/mode/yaml'
+import { storeToRefs } from 'pinia'
+import { useThemeStore } from '@/stores/theme'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -23,6 +26,8 @@ const emit = defineEmits(['update:modelValue'])
 const container = ref(null)
 let view = null
 
+const { is_dark } = storeToRefs(useThemeStore())
+
 const container_style = computed(() => ({ minHeight: props.minHeight || '200px' }))
 
 function language_ext() {
@@ -30,7 +35,29 @@ function language_ext() {
   return StreamLanguage.define(modes[props.language] || toml)
 }
 
-// 匹配项目亮色主题
+// 语法高亮配色跟随主题（canvas 外可直接用 CSS 变量，但 lezer 高亮需字面量色值）
+const highlight_styles = {
+  light: HighlightStyle.define([
+    { tag: tags.heading, color: '#18181b', fontWeight: '600' },
+    { tag: tags.keyword, color: '#2563eb' },
+    { tag: [tags.number, tags.bool, tags.null], color: '#d97706' },
+    { tag: tags.string, color: '#16a34a' },
+    { tag: [tags.comment, tags.lineComment], color: '#71717a', fontStyle: 'italic' },
+  ]),
+  dark: HighlightStyle.define([
+    { tag: tags.heading, color: '#f4f4f5', fontWeight: '600' },
+    { tag: tags.keyword, color: '#93c5fd' },
+    { tag: [tags.number, tags.bool, tags.null], color: '#fcd34d' },
+    { tag: tags.string, color: '#86efac' },
+    { tag: [tags.comment, tags.lineComment], color: '#8b8b94', fontStyle: 'italic' },
+  ]),
+}
+
+function highlight_ext() {
+  return syntaxHighlighting(is_dark.value ? highlight_styles.dark : highlight_styles.light)
+}
+
+// 界面色走设计变量，随 html.dark 自动切换
 const custom_theme = EditorView.theme({
   '&': {
     height: '100%',
@@ -53,10 +80,10 @@ const custom_theme = EditorView.theme({
     border: 'none',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgb(0 0 0 / 0.02)',
+    backgroundColor: 'color-mix(in srgb, var(--text) 3%, transparent)',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: 'rgb(0 0 0 / 0.03)',
+    backgroundColor: 'color-mix(in srgb, var(--text) 4%, transparent)',
   },
   '.cm-selectionBackground': {
     backgroundColor: 'var(--accent-soft)',
@@ -78,6 +105,7 @@ function extensions() {
   return [
     basicSetup,
     language_ext(),
+    highlight_ext(),
     EditorView.lineWrapping,
     custom_theme,
     ...(props.readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
@@ -112,6 +140,12 @@ watch(
     }
   },
 )
+
+watch(is_dark, () => {
+  if (view) {
+    view.dispatch({ effects: EditorState.reconfigure.of(extensions()) })
+  }
+})
 
 onBeforeUnmount(() => view?.destroy())
 </script>

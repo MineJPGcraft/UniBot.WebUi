@@ -258,7 +258,7 @@ defineExpose({ confirm_save })
   line-height: 1;
   padding: 2px 5px;
   border-radius: 4px;
-  background: rgb(0 0 0 / 0.05);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   color: var(--text-muted);
 }
 

@@ -24,7 +24,7 @@ defineProps({
   position: relative;
   padding: var(--space-1) var(--space-2);
   background: var(--text);
-  color: #ffffff;
+  color: var(--surface);
   border-radius: var(--radius);
   font-size: var(--text-xs);
   box-shadow: var(--shadow-md);
