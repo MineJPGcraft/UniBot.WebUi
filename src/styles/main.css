@@ -61,6 +61,11 @@
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.14);
 
+  /* 悬浮提示：默认跟随主题表面色，深色下用更亮一档的浮起色 */
+  --tooltip-bg: var(--surface);
+  --tooltip-border: var(--border);
+  --tooltip-fg: var(--text);
+
   /* 布局 */
   --sidebar-width: 216px;
   --topbar-height: 56px;
@@ -104,6 +109,10 @@ html.dark {
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
   --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+
+  --tooltip-bg: #34343b;
+  --tooltip-border: rgb(255 255 255 / 0.1);
+  --tooltip-fg: #f4f4f5;
 }
 
 /* ---------- Reset ---------- */
@@ -231,6 +240,13 @@ ol {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Tooltip 内容经 Portal 传送出组件子树，keyframes 需全局声明（同 spin 先例） */
+@keyframes ui-tooltip-fade-in {
+  from {
+    opacity: 0;
   }
 }
 

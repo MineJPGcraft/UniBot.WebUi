@@ -68,9 +68,21 @@ const cancel_text = computed(() => props.cancelText || t('common.cancel'))
   </DialogRoot>
 </template>
 
-<style scoped>
-::-webkit-scrollbar {
-  display: none;
+<style>
+/* Overlay / Content 由 reka 经 Portal 渲染，scoped 的 data-v 属性无法命中
+   （Vue scopeId 继承在 popper/dismissable 包装层断裂），需非 scoped 声明；
+   类名以 ui- 前缀保证唯一（先例：DropdownMenu / Select） */
+@keyframes ui-dialog-overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ui-dialog-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.97);
+  }
 }
 
 .ui-dialog-overlay {
@@ -78,7 +90,7 @@ const cancel_text = computed(() => props.cancelText || t('common.cancel'))
   inset: 0;
   background: rgb(24 24 27 / 0.45);
   z-index: var(--z-overlay);
-  animation: overlay-fade-in 150ms ease-out;
+  animation: ui-dialog-overlay-fade-in 150ms ease-out;
 }
 
 .ui-dialog-content {
@@ -94,13 +106,19 @@ const cancel_text = computed(() => props.cancelText || t('common.cancel'))
   box-shadow: var(--shadow-lg);
   padding: var(--space-6);
   z-index: var(--z-dialog);
-  animation: dialog-pop-in 180ms ease-out;
+  animation: ui-dialog-pop-in 180ms ease-out;
 }
 
 .ui-dialog-content:focus {
   outline: none;
 }
 
+.ui-dialog-content::-webkit-scrollbar {
+  display: none;
+}
+</style>
+
+<style scoped>
 .ui-dialog-title {
   font-size: var(--text-lg);
   font-weight: 600;
@@ -125,18 +143,5 @@ const cancel_text = computed(() => props.cancelText || t('common.cancel'))
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
-}
-
-@keyframes overlay-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes dialog-pop-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -48%) scale(0.97);
-  }
 }
 </style>

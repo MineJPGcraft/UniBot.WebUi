@@ -2,9 +2,12 @@
  * ANSI 彩色文本 → 安全 HTML 片段
  * 解析 loguru 输出的 ANSI 转义序列（前景色 30-37 / 90-97、背景 40-47 / 100-107、
  * 属性 1 加粗 / 2 暗淡 / 3 斜体 / 4 下划线 / 0 重置），文本内容始终先做 HTML 转义。
+ * 前景色按当前主题取字面量（canvas 外本可用 CSS 变量，但此处是内联 style 片段）。
  */
+import { useThemeStore } from '@/stores/theme'
 
-const ANSI_COLORS = {
+/* 浅色主题：白色（37/97）改用深色，否则浅底不可读 */
+const ANSI_COLORS_LIGHT = {
   30: '#3f3f46', // black
   31: '#dc2626', // red
   32: '#16a34a', // green
@@ -12,7 +15,7 @@ const ANSI_COLORS = {
   34: '#2563eb', // blue
   35: '#c026d3', // magenta
   36: '#0891b2', // cyan
-  37: '#18181b', // white（浅色主题下白色文字不可读，改用深色）
+  37: '#18181b', // white
   90: '#71717a', // light-black
   91: '#ef4444', // light-red
   92: '#22c55e', // light-green
@@ -21,6 +24,26 @@ const ANSI_COLORS = {
   95: '#e879f9', // light-magenta
   96: '#06b6d4', // light-cyan
   97: '#18181b', // light-white
+}
+
+/* 深色主题：整体提亮一档，黑/白反转保证可读 */
+const ANSI_COLORS_DARK = {
+  30: '#d4d4d8', // black
+  31: '#f87171', // red
+  32: '#4ade80', // green
+  33: '#fbbf24', // yellow
+  34: '#60a5fa', // blue
+  35: '#e879f9', // magenta
+  36: '#22d3ee', // cyan
+  37: '#f4f4f5', // white
+  90: '#a1a1aa', // light-black
+  91: '#fca5a5', // light-red
+  92: '#86efac', // light-green
+  93: '#fde047', // light-yellow
+  94: '#93c5fd', // light-blue
+  95: '#f0abfc', // light-magenta
+  96: '#67e8f9', // light-cyan
+  97: '#ffffff', // light-white
 }
 
 const ANSI_BG_COLORS = {
@@ -42,6 +65,10 @@ const ANSI_BG_COLORS = {
   107: '#f4f4f5',
 }
 
+function foreground_palette() {
+  return useThemeStore().is_dark ? ANSI_COLORS_DARK : ANSI_COLORS_LIGHT
+}
+
 const ANSI_PATTERN = /\x1b\[([0-9;]*)m/g
 
 function escape_html(text) {
@@ -55,6 +82,7 @@ function escape_html(text) {
 /** 将 ANSI 彩色文本转换为安全 HTML（文本已转义，可安全用于 v-html）。 */
 export function ansi_to_html(raw) {
   if (!raw) return ''
+  const colors = foreground_palette()
   const escaped = escape_html(raw)
   const styles = new Set()
   let html = ''
@@ -78,9 +106,9 @@ export function ansi_to_html(raw) {
       } else if (code === 4) {
         styles.add('text-decoration:underline')
       } else if (code >= 30 && code <= 37) {
-        styles.add(`color:${ANSI_COLORS[code]}`)
+        styles.add(`color:${colors[code]}`)
       } else if (code >= 90 && code <= 97) {
-        styles.add(`color:${ANSI_COLORS[code]}`)
+        styles.add(`color:${colors[code]}`)
       } else if (code >= 40 && code <= 47) {
         styles.add(`background:${ANSI_BG_COLORS[code]}`)
       } else if (code >= 100 && code <= 107) {

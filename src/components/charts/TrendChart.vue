@@ -29,8 +29,22 @@ const { is_dark } = storeToRefs(useThemeStore())
 /** ECharts 用 canvas 渲染，颜色需为字面量，无法解析 CSS 变量 */
 const chart_palette = computed(() =>
   is_dark.value
-    ? { text: '#a1a1aa', axis_line: '#52525b', split_line: '#36363c' }
-    : { text: '#71717a', axis_line: '#e4e4e7', split_line: '#e4e4e7' },
+    ? {
+        text: '#a1a1aa',
+        axis_line: '#52525b',
+        split_line: '#36363c',
+        tooltip_bg: '#29292e',
+        tooltip_border: '#52525b',
+        tooltip_text: '#f4f4f5',
+      }
+    : {
+        text: '#71717a',
+        axis_line: '#e4e4e7',
+        split_line: '#e4e4e7',
+        tooltip_bg: '#ffffff',
+        tooltip_border: '#e4e4e7',
+        tooltip_text: '#18181b',
+      },
 )
 
 const chart_option = computed(() => ({
@@ -39,6 +53,9 @@ const chart_option = computed(() => ({
     trigger: 'axis',
     axisPointer: { type: 'shadow' },
     confine: true,
+    backgroundColor: chart_palette.value.tooltip_bg,
+    borderColor: chart_palette.value.tooltip_border,
+    textStyle: { color: chart_palette.value.tooltip_text },
   },
   legend: {
     top: 0,
