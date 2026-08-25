@@ -176,9 +176,15 @@ async function install_market_extension(item) {
   market_action.value = item.id
   try {
     await extension_store.install_market(item.id)
-    toast.success(t('extensions.installed_install_success', { name: item.name }))
+    // 先热重载让扩展进入注册表，再刷新市场列表（「已安装」状态实时计算自注册表）
+    const reloaded = await run(
+      () => extension_store.reload(),
+      t('extensions.installed_install_reload_failed', { name: item.name }),
+    )
     await search_market()
-    ask_restart(t('extensions.installed_install_restart_prompt', { name: item.name }))
+    if (reloaded) {
+      toast.success(t('extensions.installed_install_success', { name: item.name }))
+    }
   } catch (error) {
     toast.error(error.message || t('extensions.installed_install_failed'))
   } finally {
@@ -189,9 +195,15 @@ async function install_market_extension(item) {
 async function uninstall_extension(extension) {
   try {
     await extension_store.uninstall_extension(extension.id)
-    toast.success(t('extensions.installed_uninstall_success', { name: extension.name }))
+    // 先热重载让扩展从注册表移除，再刷新市场列表（「已安装」状态实时计算自注册表）
+    const reloaded = await run(
+      () => extension_store.reload(),
+      t('extensions.installed_uninstall_reload_failed', { name: extension.name }),
+    )
     await search_market()
-    ask_restart(t('extensions.installed_uninstall_restart_prompt', { name: extension.name }))
+    if (reloaded) {
+      toast.success(t('extensions.installed_uninstall_success', { name: extension.name }))
+    }
   } catch (error) {
     toast.error(error.message || t('extensions.installed_uninstall_failed'))
   }

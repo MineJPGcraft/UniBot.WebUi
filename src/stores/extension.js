@@ -161,6 +161,12 @@ export const useExtensionStore = defineStore('extension', () => {
     await fetch_installed()
   }
 
+  /** 热重载全部扩展（安装/卸载/启停后立即生效，无需重启 Bot） */
+  async function reload() {
+    await http.post('/api/extensions/reload', {})
+    await fetch_installed()
+  }
+
   /** 获取图片模式依赖扩展（Html2Pic / Default）的下载情况 */
   async function fetch_image_requirements() {
     image_requirements_loading.value = true
@@ -258,6 +264,7 @@ export const useExtensionStore = defineStore('extension', () => {
     fetch_market,
     install_market,
     uninstall_extension,
+    reload,
     fetch_image_requirements,
     fetch_studio_status,
     launch_studio,

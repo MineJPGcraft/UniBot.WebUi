@@ -26,11 +26,9 @@
     "installed_config_action": "配置",
     "installed_uninstall_action": "卸载",
     "installed_fetch_list_failed": "获取扩展列表失败",
-    "installed_install_success": "扩展 {name} 安装成功，重启后生效",
-    "installed_install_restart_prompt": "扩展 {name} 安装成功，需要重启机器人生效，是否立即重启？",
+    "installed_install_success": "扩展 {name} 安装成功并已热重载",
     "installed_install_failed": "安装失败",
-    "installed_uninstall_success": "扩展 {name} 已卸载，重启后生效",
-    "installed_uninstall_restart_prompt": "扩展 {name} 已卸载，需要重启机器人生效，是否立即重启？",
+    "installed_uninstall_success": "扩展 {name} 已卸载并已热重载",
     "installed_uninstall_failed": "卸载失败",
     "installed_enable_success": "已启用 {name}",
     "installed_disable_success": "已禁用 {name}",
@@ -111,7 +109,9 @@
     "form_color_placeholder": "#RRGGBB 或 #RRGGBBAA",
     "form_secret_placeholder": "留空则不修改",
     "form_unsupported_type": "暂不支持该类型",
-    "form_save": "保存配置"
+    "form_save": "保存配置",
+    "installed_install_reload_failed": "扩展 {name} 已安装，但热重载失败，请重启机器人生效",
+    "installed_uninstall_reload_failed": "扩展 {name} 已卸载，但热重载失败，请重启机器人生效"
   },
   "en": {
     "page_title": "Extensions",
@@ -140,11 +140,9 @@
     "installed_config_action": "Configure",
     "installed_uninstall_action": "Uninstall",
     "installed_fetch_list_failed": "Failed to load extensions",
-    "installed_install_success": "Extension {name} installed, takes effect after restart",
-    "installed_install_restart_prompt": "Extension {name} was installed. The bot needs a restart to apply it. Restart now?",
+    "installed_install_success": "Extension {name} installed and hot-reloaded",
     "installed_install_failed": "Install failed",
-    "installed_uninstall_success": "Extension {name} uninstalled, takes effect after restart",
-    "installed_uninstall_restart_prompt": "Extension {name} was uninstalled. The bot needs a restart to apply it. Restart now?",
+    "installed_uninstall_success": "Extension {name} uninstalled and hot-reloaded",
     "installed_uninstall_failed": "Uninstall failed",
     "installed_enable_success": "Enabled {name}",
     "installed_disable_success": "Disabled {name}",
@@ -225,6 +223,8 @@
     "form_color_placeholder": "#RRGGBB or #RRGGBBAA",
     "form_secret_placeholder": "Leave blank to keep unchanged",
     "form_unsupported_type": "Unsupported type",
-    "form_save": "Save Configuration"
+    "form_save": "Save Configuration",
+    "installed_install_reload_failed": "Extension {name} installed, but hot reload failed. Please restart the bot.",
+    "installed_uninstall_reload_failed": "Extension {name} uninstalled, but hot reload failed. Please restart the bot."
   }
 }
