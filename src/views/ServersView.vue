@@ -172,6 +172,7 @@ async function submit_broadcast() {
 
 .server-card {
   padding: var(--space-5);
+  min-width: 0;
   cursor: pointer;
   transition:
     border-color var(--transition),

@@ -256,6 +256,7 @@ onMounted(async () => {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
+  min-width: 0;
 }
 
 .stat-cell + .stat-cell {
@@ -298,6 +299,11 @@ onMounted(async () => {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-5);
   margin-bottom: var(--space-5);
+}
+
+/* 防止 nowrap 内容（MOTD 等）把 1fr 轨道撑到 min-content 导致整页横向溢出 */
+.dashboard-grid > .card {
+  min-width: 0;
 }
 
 /* 服务器行 */

@@ -142,7 +142,7 @@ function handle_command_keydown(event) {
 <template>
   <div class="page">
     <div class="page-header">
-      <div>
+      <div class="server-heading">
         <button class="back-link" @click="router.push('/servers')">
           <Icon icon="lucide:arrow-left" width="14" />
           {{ t('servers.server_detail_back_to_list') }}
@@ -298,6 +298,19 @@ function handle_command_keydown(event) {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
+}
+
+/* 页头左侧列：允许收缩，让 MOTD 省略号生效 */
+.server-heading {
+  min-width: 0;
+}
+
+/* MOTD 纯文本过长时在标题区内省略，防止撑破页头 */
+.page-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .server-dot {
