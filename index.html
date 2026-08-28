@@ -12,6 +12,8 @@
         if (saved === 'dark' || (!saved && prefers_dark)) {
           document.documentElement.classList.add('dark')
         }
+        const locale = localStorage.getItem('unibot_locale')
+        document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN'
       })()
     </script>
   </head>

@@ -75,10 +75,16 @@ export function current_locale() {
   return i18n.global.locale.value
 }
 
+/** 语言对应的 <html lang> 声明（zh 用 zh-CN，与 index.html 默认一致） */
+function html_lang(locale) {
+  return locale === 'en' ? 'en' : 'zh-CN'
+}
+
 /** 切换语言并持久化（组件内响应式生效） */
 export function set_locale(locale) {
   i18n.global.locale.value = locale
   localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+  document.documentElement.lang = html_lang(locale)
 }
 
 /** 组件外取译文（http.js / composable 等非组件上下文使用） */
