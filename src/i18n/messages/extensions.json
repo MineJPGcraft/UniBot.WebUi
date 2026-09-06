@@ -109,6 +109,8 @@
     "form_color_placeholder": "#RRGGBB 或 #RRGGBBAA",
     "form_secret_placeholder": "留空则不修改",
     "form_unsupported_type": "暂不支持该类型",
+    "form_item_add": "添加一项",
+    "form_item_remove": "移除",
     "form_save": "保存配置",
     "installed_install_reload_failed": "扩展 {name} 已安装，但热重载失败，请重启机器人生效",
     "installed_uninstall_reload_failed": "扩展 {name} 已卸载，但热重载失败，请重启机器人生效"
@@ -223,6 +225,8 @@
     "form_color_placeholder": "#RRGGBB or #RRGGBBAA",
     "form_secret_placeholder": "Leave blank to keep unchanged",
     "form_unsupported_type": "Unsupported type",
+    "form_item_add": "Add Item",
+    "form_item_remove": "Remove",
     "form_save": "Save Configuration",
     "installed_install_reload_failed": "Extension {name} installed, but hot reload failed. Please restart the bot.",
     "installed_uninstall_reload_failed": "Extension {name} uninstalled, but hot reload failed. Please restart the bot."
