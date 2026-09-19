@@ -27,6 +27,11 @@ export const useExtensionStore = defineStore('extension', () => {
   const render_config_loading = ref(false)
   const saving_render_config = ref('')
 
+  // 全部扩展配置（含无代码模板包），供配置中心统一编辑
+  const config_items = ref([])
+  const config_items_loading = ref(false)
+  const saving_config_item = ref('')
+
   // 扩展市场
   const market_items = ref([])
   const market_loading = ref(false)
@@ -136,6 +141,27 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
+  /** 获取全部带配置项的扩展（代码扩展 + 无代码模板包） */
+  async function fetch_config_items() {
+    config_items_loading.value = true
+    try {
+      config_items.value = (await http.get('/api/extensions/config-items')) || []
+    } finally {
+      config_items_loading.value = false
+    }
+  }
+
+  /** 保存单个扩展的配置项 */
+  async function save_config_item(extension_id, values) {
+    saving_config_item.value = extension_id
+    try {
+      await http.patch(`/api/extensions/${encodeURIComponent(extension_id)}/config`, values)
+      await fetch_config_items()
+    } finally {
+      saving_config_item.value = ''
+    }
+  }
+
   async function fetch_market(force = false) {
     market_loading.value = true
     try {
@@ -240,6 +266,9 @@ export const useExtensionStore = defineStore('extension', () => {
     render_configs,
     render_config_loading,
     saving_render_config,
+    config_items,
+    config_items_loading,
+    saving_config_item,
     market_items,
     market_loading,
     image_requirements,
@@ -261,6 +290,8 @@ export const useExtensionStore = defineStore('extension', () => {
     switch_template,
     fetch_render_configs,
     save_render_config,
+    fetch_config_items,
+    save_config_item,
     fetch_market,
     install_market,
     uninstall_extension,
