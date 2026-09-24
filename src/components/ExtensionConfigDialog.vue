@@ -1,10 +1,17 @@
 <script setup>
 /**
- * 扩展配置弹窗：复用 ExtensionConfigForm 动态表单，确认按钮触发表单保存。
+ * 扩展配置弹窗：复用 ExtensionConfigForm 动态表单。
+ *
+ *    与配置中心一致的交互：保存操作位于表单右上角操作栏（含改动计数），
+ *    无改动时「取消」与「保存」均不可用；操作栏左侧提供「在配置中心打开」
+ *    入口（配置中心为管理员专属路由，非管理员禁用）。
  */
-import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
+import { useAuthStore } from '@/stores/auth'
 import Dialog from '@/components/ui/Dialog.vue'
+import Button from '@/components/ui/Button.vue'
 import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
 
 const props = defineProps({
@@ -18,13 +25,18 @@ const props = defineProps({
 const emit = defineEmits(['save'])
 
 const { t } = useI18n()
+const router = useRouter()
+const auth_store = useAuthStore()
 
 const open = defineModel({ type: Boolean, default: false })
 
-const form_ref = ref(null)
-
-function on_confirm() {
-  form_ref.value?.confirm_save()
+/** 跳转到配置中心的扩展配置 Tab，并预选当前扩展（仅管理员可用） */
+function open_in_config_page() {
+  if (!auth_store.is_admin) return
+  open.value = false
+  const query = { tab: 'extensions' }
+  if (props.extension?.id) query.extension = props.extension.id
+  router.push({ name: 'ConfigView', query })
 }
 </script>
 
@@ -37,18 +49,29 @@ function on_confirm() {
       })
     "
     :description="extension?.description || ''"
-    :confirm-text="t('extensions.config_dialog_confirm')"
-    :loading="saving"
-    @confirm="on_confirm"
+    hide-footer
+    width="70vw"
   >
     <ExtensionConfigForm
-      ref="form_ref"
       :schema="schema"
       :values="values"
       :loading="loading"
       :saving="saving"
-      :show-actions="false"
       @save="(payload) => emit('save', payload)"
-    />
+    >
+      <template #actions-left>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="config-page-link"
+          :disabled="!auth_store.is_admin"
+          :title="t('extensions.config_dialog_open_config_page')"
+          @click="open_in_config_page"
+        >
+          <Icon icon="lucide:external-link" width="14" />
+          {{ t('extensions.config_dialog_open_config_page') }}
+        </Button>
+      </template>
+    </ExtensionConfigForm>
   </Dialog>
 </template>

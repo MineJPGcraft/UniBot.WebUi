@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
@@ -55,11 +55,7 @@ const {
   has_messages_changes,
 } = storeToRefs(config_store)
 
-const {
-  config_items,
-  config_items_loading,
-  saving_config_item,
-} = storeToRefs(extension_store)
+const { config_items, config_items_loading, saving_config_item } = storeToRefs(extension_store)
 
 const route = useRoute()
 const router = useRouter()
@@ -81,6 +77,11 @@ const raw_loaded = ref(false)
 const json_errors = ref({})
 const platform_item_ids = ref({})
 let platform_item_sequence = 0
+
+/** 扩展配置表单引用（操作栏外置到 tab-actions，经 ref 触发表单保存/撤销） */
+const extension_form_ref = ref(null)
+/** 当前扩展配置的改动字段数量（由表单 change 事件同步） */
+const extension_config_changes = ref(0)
 
 const tabs = computed(() => [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
@@ -199,6 +200,9 @@ async function save_extension_item(item, values) {
   try {
     await extension_store.save_config_item(item.id, values)
     toast.success(t('extensions.config_save_success', { name: item.name }))
+    // store 刷新后 values 已是新值，等一次渲染再重建草稿清除改动计数
+    await nextTick()
+    extension_form_ref.value?.reset_draft()
   } catch (error) {
     toast.error(error.message || t('extensions.config_save_failed'))
   }
@@ -248,6 +252,8 @@ watch(active_env_group, (val) => {
 })
 watch(active_extension_id, (val) => {
   if (active_tab.value === 'extensions') sync_query({ extension: val })
+  // 切换扩展时表单会重建，先清零计数避免操作栏闪出上一项的改动数
+  extension_config_changes.value = 0
 })
 
 function sync_query(patch) {
@@ -945,6 +951,25 @@ async function confirm_messages_save() {
           <span class="text-xs text-muted tab-action-left">
             {{ t('config_view.tab_extensions_hint') }}
           </span>
+          <Button
+            variant="ghost"
+            :disabled="!extension_config_changes"
+            @click="extension_form_ref?.reset_draft()"
+          >
+            {{ t('config_view.revert_changes') }}
+          </Button>
+          <Button
+            variant="primary"
+            :disabled="!extension_config_changes"
+            :loading="saving_config_item === active_extension_id"
+            @click="extension_form_ref?.confirm_save()"
+          >
+            <Icon icon="lucide:save" width="15" />
+            {{ t('config_view.save_changes') }}
+            <span v-if="extension_config_changes" class="change-count">
+              {{ extension_config_changes }}
+            </span>
+          </Button>
         </div>
 
         <div v-if="config_items_loading || !extensions_loaded" class="card">
@@ -970,6 +995,10 @@ async function confirm_messages_save() {
               @click="active_extension_id = item.id"
             >
               <span class="group-item-name">{{ item.name }}</span>
+              <span
+                v-if="item.id === active_extension_id && extension_config_changes"
+                class="group-dot"
+              />
             </button>
           </nav>
 
@@ -1002,10 +1031,13 @@ async function confirm_messages_save() {
             </p>
             <div class="extension-panel-form">
               <ExtensionConfigForm
+                ref="extension_form_ref"
                 :key="active_extension_item.id"
                 :schema="active_extension_item.schema"
                 :values="active_extension_item.values"
                 :saving="saving_config_item === active_extension_item.id"
+                :show-actions="false"
+                @change="(count) => (extension_config_changes = count)"
                 @save="(values) => save_extension_item(active_extension_item, values)"
               />
             </div>

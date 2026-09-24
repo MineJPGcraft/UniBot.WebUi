@@ -3,17 +3,22 @@
  * 扩展配置动态表单（schema 驱动）。
  *
  *    可内联使用（渲染设置页）或嵌入 Dialog（扩展配置弹窗）。
- *    通过 `save` 事件提交校验后的 payload；`confirm_save` 由父组件
- *    经 ref 调用（Dialog 确认按钮场景）。
+ *    通过 `save` 事件提交校验后的 payload；`confirm_save` / `reset_draft`
+ *    由父组件经 ref 调用（操作栏外置到对话框或卡片外部的场景）。
+ *
+ *    `show-actions` 为 true 时在表单顶部渲染「撤销 / 保存」操作栏；
+ *    为 false 时父组件通过 `change` 事件拿到改动数量，自行渲染操作栏。
  */
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Icon } from '@iconify/vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const props = defineProps({
   schema: { type: Object, default: null },
@@ -24,7 +29,7 @@ const props = defineProps({
   showActions: { type: Boolean, default: true },
 })
 
-const emit = defineEmits(['save'])
+const emit = defineEmits(['save', 'change'])
 
 const { t } = useI18n()
 
@@ -108,7 +113,9 @@ function array_item_schema(property) {
 function is_object_array(property) {
   if (property.type !== 'array') return false
   const item = array_item_schema(property)
-  return Boolean(item && item.type === 'object' && item.properties && Object.keys(item.properties).length > 0)
+  return Boolean(
+    item && item.type === 'object' && item.properties && Object.keys(item.properties).length > 0,
+  )
 }
 
 /** 对象数组元素的子字段列表 */
@@ -134,6 +141,83 @@ function remove_object_item(key, index) {
 
 function field_label(property, key) {
   return property.title || key
+}
+
+/** 字段原始值（按控件语义归一化，用于与草稿比对是否已改动） */
+function original_value(key, property) {
+  const current = props.values[key] ?? property.default ?? ''
+  if (is_object_array(property) || field_type(property) === 'array') {
+    return Array.isArray(current) ? current : []
+  }
+  return current
+}
+
+/** 字段草稿值（数组归一化为数组，便于与原始值同构比较） */
+function draft_value(key, property) {
+  const value = draft[key]
+  if (is_object_array(property)) return value || []
+  if (field_type(property) === 'array') {
+    return String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return value
+}
+
+/** 依据字段类型归一化单个值（用于比对，避免 '1' 与 1 被误判为改动） */
+function normalize_for_compare(value, property) {
+  if (!property) return value ?? null
+  const kind = field_type(property)
+  if (kind === 'number') return value === '' || value == null ? null : Number(value)
+  if (kind === 'boolean') return Boolean(value)
+  if (kind === 'array') return Array.isArray(value) ? value : []
+  return value ?? ''
+}
+
+/** 已改动字段 key 集合（Set 查找，供模板与计数复用） */
+const changed_keys = computed(() => {
+  const properties = props.schema?.properties || {}
+  const changed = new Set()
+  for (const key of Object.keys(properties)) {
+    const property = properties[key]
+    const draft_current = draft_value(key, property)
+    const original = original_value(key, property)
+    if (is_object_array(property)) {
+      const item_properties = object_item_properties(property)
+      const items_differ =
+        draft_current.length !== original.length ||
+        draft_current.some((item, index) => {
+          const origin_item = original[index] || {}
+          return Object.keys(item_properties).some(
+            (name) =>
+              JSON.stringify(normalize_for_compare(item?.[name], item_properties[name])) !==
+              JSON.stringify(normalize_for_compare(origin_item?.[name], item_properties[name])),
+          )
+        })
+      if (items_differ) changed.add(key)
+    } else if (
+      JSON.stringify(normalize_for_compare(draft_current, property)) !==
+      JSON.stringify(normalize_for_compare(original, property))
+    ) {
+      changed.add(key)
+    }
+  }
+  return changed
+})
+
+const has_changes = computed(() => changed_keys.value.size > 0)
+
+// 改动数量变化时向父组件通报（外置操作栏需要展示计数 / 禁用态）
+watch(
+  () => changed_keys.value.size,
+  (count) => emit('change', count),
+  { immediate: true },
+)
+
+/** 丢弃当前草稿改动，回到原始值 */
+function reset_draft() {
+  rebuild_draft()
 }
 
 function is_secret(key) {
@@ -165,7 +249,9 @@ function confirm_save() {
     const property = properties[key]
     if (is_object_array(property)) {
       // 对象数组：直接提交对象列表（含数值字段归一化）
-      payload[key] = (value || []).map((item) => normalize_object_item(item, object_item_properties(property)))
+      payload[key] = (value || []).map((item) =>
+        normalize_object_item(item, object_item_properties(property)),
+      )
     } else if (field_type(property) === 'array') {
       // 数组以逗号分隔文本编辑，保存时拆分为数组
       payload[key] = String(value || '')
@@ -188,7 +274,7 @@ function normalize_object_item(item, item_properties) {
     const def = item_properties[name]
     const kind = def ? field_type(def) : ''
     if (kind === 'number') {
-      normalized[name] = raw === '' || raw == null ? def.default ?? null : Number(raw)
+      normalized[name] = raw === '' || raw == null ? (def.default ?? null) : Number(raw)
     } else if (kind === 'boolean') {
       normalized[name] = Boolean(raw)
     } else {
@@ -198,31 +284,54 @@ function normalize_object_item(item, item_properties) {
   return normalized
 }
 
-defineExpose({ confirm_save })
+defineExpose({ confirm_save, reset_draft, has_changes })
 </script>
 
 <template>
   <div v-if="loading" class="loading-block">
-    <Spinner :size="16" /> {{ t('extensions.form_loading') }}
+    <Spinner :size="18" /> {{ t('extensions.form_loading') }}
   </div>
-  <div v-else-if="!schema || !Object.keys(schema.properties || {}).length" class="config-empty">
-    {{ t('extensions.form_empty') }}
-  </div>
-  <div v-else class="config-form">
+  <EmptyState
+    v-else-if="!schema || !Object.keys(schema.properties || {}).length"
+    icon="lucide:file-cog"
+    :title="t('extensions.form_empty')"
+  />
+  <div v-else class="extension-config-form">
+    <div v-if="showActions" class="form-actions">
+      <div class="form-actions-left">
+        <slot name="actions-left" />
+      </div>
+      <Button variant="ghost" :disabled="!has_changes" @click="reset_draft">
+        {{ t('extensions.form_revert') }}
+      </Button>
+      <Button
+        variant="primary"
+        :loading="saving"
+        :disabled="disabled || !has_changes"
+        @click="confirm_save"
+      >
+        <Icon icon="lucide:save" width="15" />
+        {{ t('extensions.form_save') }}
+        <span v-if="has_changes" class="change-count">{{ changed_keys.size }}</span>
+      </Button>
+    </div>
     <div
       v-for="(property, key) in schema.properties || {}"
       :key="key"
-      class="config-row"
-      :class="{ 'config-row--wide': is_object_array(property) }"
+      class="field-row"
+      :class="{
+        'field-row--changed': changed_keys.has(key),
+        'field-row--wide': is_object_array(property),
+      }"
     >
-      <div class="config-meta">
-        <label class="config-label">
+      <div class="field-meta">
+        <label class="field-label">
           {{ field_label(property, key) }}
-          <span class="mono config-key">{{ key }}</span>
+          <span class="mono field-key">{{ key }}</span>
         </label>
-        <p v-if="property.description" class="config-desc">{{ property.description }}</p>
+        <p v-if="property.description" class="field-desc">{{ property.description }}</p>
       </div>
-      <div class="config-control">
+      <div class="field-control">
         <Switch
           v-if="field_type(property) === 'boolean'"
           v-model="draft[key]"
@@ -264,7 +373,7 @@ defineExpose({ confirm_save })
           :placeholder="t('extensions.form_secret_placeholder')"
           :disabled="disabled"
         />
-        <div v-else-if="is_object_array(property)" class="object-array">
+        <div v-else-if="is_object_array(property)" class="object-list">
           <div v-for="(item, item_index) in draft[key] || []" :key="item_index" class="object-item">
             <div class="object-item-head">
               <span class="object-item-title">
@@ -273,10 +382,12 @@ defineExpose({ confirm_save })
               <Button
                 variant="ghost"
                 size="sm"
+                icon-only
                 :disabled="disabled"
+                :title="t('extensions.form_item_remove')"
                 @click="remove_object_item(key, item_index)"
               >
-                {{ t('extensions.form_item_remove') }}
+                <Icon icon="lucide:x" width="14" />
               </Button>
             </div>
             <div class="object-item-grid">
@@ -285,15 +396,11 @@ defineExpose({ confirm_save })
                 :key="sub_key"
                 class="object-field"
               >
-                <div class="object-field-head">
-                  <label class="object-field-label">
-                    {{ field_label(sub_property, sub_key) }}
-                  </label>
-                  <span v-if="sub_property.description" class="object-field-key">
-                    {{ sub_key }}
-                  </span>
-                </div>
-                <p v-if="sub_property.description" class="object-field-desc">
+                <label class="object-field-label">
+                  {{ field_label(sub_property, sub_key) }}
+                  <span class="mono field-key">{{ sub_key }}</span>
+                </label>
+                <p v-if="sub_property.description" class="field-desc">
                   {{ sub_property.description }}
                 </p>
                 <Switch
@@ -325,7 +432,14 @@ defineExpose({ confirm_save })
               </div>
             </div>
           </div>
-          <Button variant="secondary" size="sm" class="object-add" :disabled="disabled" @click="add_object_item(key)">
+          <Button
+            variant="secondary"
+            size="sm"
+            class="object-add"
+            :disabled="disabled"
+            @click="add_object_item(key)"
+          >
+            <Icon icon="lucide:plus" width="13" />
             {{ t('extensions.form_item_add') }}
           </Button>
         </div>
@@ -340,122 +454,147 @@ defineExpose({ confirm_save })
           v-model="draft[key]"
           :disabled="disabled"
         />
-        <div v-else class="config-unsupported">{{ t('extensions.form_unsupported_type') }}</div>
+        <div v-else class="field-unsupported">{{ t('extensions.form_unsupported_type') }}</div>
       </div>
-    </div>
-    <div v-if="showActions" class="config-actions">
-      <Button size="sm" :loading="saving" :disabled="disabled" @click="confirm_save">
-        {{ t('extensions.form_save') }}
-      </Button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.loading-block,
-.config-empty {
+.extension-config-form {
   display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 操作栏：置于表单右上角，与配置中心 tab-actions 一致 */
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* 操作栏左侧扩展位（如弹窗的「在配置中心打开」） */
+.form-actions-left {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.change-count {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-6) 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.25);
+  font-size: var(--text-xs);
 }
 
-.config-form {
+/* 字段行：与 ConfigView 配置项保持一致（左描述 / 右控件） */
+.field-row {
   display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.config-row {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-6);
+  padding: var(--space-4) 0;
 }
 
-/* 对象数组等通栏大区块：整行纵向排布，顶部对齐，避免居中挤压 */
-.config-row--wide {
+.field-row + .field-row {
+  border-top: 1px solid var(--border);
+}
+
+/* 已改动字段行：警示底色高亮（与配置中心同一处理） */
+.field-row--changed {
+  background: linear-gradient(to right, var(--warning-soft), transparent 60%);
+  margin: 0 calc(-1 * var(--space-4));
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+  border-radius: var(--radius);
+}
+
+/* 对象数组等通栏区块：整行纵向排布，避免右侧被压窄 */
+.field-row--wide {
   flex-direction: column;
   align-items: stretch;
+  gap: var(--space-3);
 }
 
-.config-row:last-child {
-  border-bottom: none;
-}
-
-.config-row--wide .config-control {
-  width: 100%;
-  flex-direction: column;
-  align-items: stretch;
-}
-
-/* 通栏行的填写控件（如对象数组卡片）恢复整行排布，不限制宽度 */
-.config-row--wide .config-control > .ui-input,
-.config-row--wide .config-control > :deep(.ui-input),
-.config-row--wide .config-control > :deep(.ui-select-trigger) {
-  max-width: none;
-}
-
-.config-meta {
+.field-meta {
   flex: 1;
   min-width: 0;
 }
 
-.config-label {
+.field-label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text);
 }
 
-.config-key {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
+.field-key {
+  font-size: 11px;
   color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 var(--space-1);
 }
 
-.config-desc {
-  margin-top: var(--space-1);
+.field-desc {
+  margin-top: 2px;
   font-size: var(--text-xs);
   color: var(--text-muted);
   line-height: 1.5;
 }
 
-.config-control {
-  flex: 1;
+.field-control {
+  flex: 0 0 40%;
+  width: 40%;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 
-/* 右侧填写控件在区域内居中且保持合适宽度，不顶满也不贴边 */
-.config-control > .ui-input,
-.config-control > :deep(.ui-input),
-.config-control > :deep(.ui-select-trigger) {
-  flex: 0 1 auto;
+.field-row--wide .field-control {
+  flex: 1 1 auto;
   width: 100%;
-  max-width: 240px;
+  justify-content: flex-start;
+}
+
+/* 单选控件填满右侧栏；开关等内联控件保持自身宽度。
+   Select / Color 等控件内部元素需 :deep() 才可命中（同 ConfigView 先例） */
+.field-control > :deep(.ui-input),
+.field-control > :deep(.ui-textarea),
+.field-control > :deep(.ui-select-trigger),
+.field-control > .color-control {
+  width: 100%;
+}
+
+.field-control > :deep(.ui-select-trigger) {
+  justify-content: space-between;
+}
+
+.field-unsupported {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
 }
 
 .color-control {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
 }
 
 .color-control .ui-input {
@@ -471,6 +610,7 @@ defineExpose({ confirm_save })
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
+  transition: border-color var(--transition);
 }
 
 .color-picker::-webkit-color-swatch-wrapper {
@@ -482,7 +622,7 @@ defineExpose({ confirm_save })
   border-radius: 3px;
 }
 
-.color-picker:hover {
+.color-picker:hover:not(:disabled) {
   border-color: var(--border-strong);
 }
 
@@ -497,31 +637,21 @@ defineExpose({ confirm_save })
   cursor: not-allowed;
 }
 
-.config-unsupported {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  padding-top: var(--space-2);
-}
-
-.config-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: var(--space-3);
-}
-
-.object-array {
+/* 对象数组：与 JsonFormEditor 的卡片列表保持同一视觉语言 */
+.object-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  width: 100%;
 }
 
 .object-item {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--surface-sunken);
 }
 
@@ -529,12 +659,15 @@ defineExpose({ confirm_save })
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
 }
 
 .object-item-title {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .object-item-grid {
@@ -550,44 +683,35 @@ defineExpose({ confirm_save })
   min-width: 0;
 }
 
-.object-field-head {
+.object-field-label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.object-field-label {
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-muted);
 }
 
-.object-field-key {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1;
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-  color: var(--text-muted);
-}
-
-.object-field-desc {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
 .object-field :deep(.ui-input),
+.object-field :deep(.ui-textarea),
 .object-field :deep(.ui-select-trigger) {
   width: 100%;
 }
 
-.object-field :deep(.ui-select-trigger) {
-  justify-content: space-between;
-}
-
 .object-add {
   align-self: flex-start;
+}
+
+@media (max-width: 900px) {
+  .field-row {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .field-control {
+    flex: 1 1 auto;
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 </style>

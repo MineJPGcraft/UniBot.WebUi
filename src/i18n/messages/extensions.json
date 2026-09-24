@@ -103,7 +103,7 @@
     "config_fetch_failed": "获取扩展配置失败",
     "config_dialog_default_name": "扩展",
     "config_dialog_title": "{name} 配置",
-    "config_dialog_confirm": "保存",
+    "config_dialog_open_config_page": "在配置中心打开",
     "form_loading": "加载配置中…",
     "form_empty": "该扩展未声明配置项",
     "form_color_placeholder": "#RRGGBB 或 #RRGGBBAA",
@@ -112,6 +112,7 @@
     "form_item_add": "添加一项",
     "form_item_remove": "移除",
     "form_save": "保存配置",
+    "form_revert": "撤销修改",
     "installed_install_reload_failed": "扩展 {name} 已安装，但热重载失败，请重启机器人生效",
     "installed_uninstall_reload_failed": "扩展 {name} 已卸载，但热重载失败，请重启机器人生效"
   },
@@ -219,7 +220,7 @@
     "config_fetch_failed": "Failed to load extension configuration",
     "config_dialog_default_name": "Extension",
     "config_dialog_title": "{name} Settings",
-    "config_dialog_confirm": "Save",
+    "config_dialog_open_config_page": "Open in Configuration Center",
     "form_loading": "Loading configuration…",
     "form_empty": "This extension declares no configuration options",
     "form_color_placeholder": "#RRGGBB or #RRGGBBAA",
@@ -228,6 +229,7 @@
     "form_item_add": "Add Item",
     "form_item_remove": "Remove",
     "form_save": "Save Configuration",
+    "form_revert": "Revert Changes",
     "installed_install_reload_failed": "Extension {name} installed, but hot reload failed. Please restart the bot.",
     "installed_uninstall_reload_failed": "Extension {name} uninstalled, but hot reload failed. Please restart the bot."
   }
