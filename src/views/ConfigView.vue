@@ -16,9 +16,12 @@ import Switch from '@/components/ui/Switch.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
+import Badge from '@/components/ui/Badge.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
 import JsonFormEditor from '@/components/ui/JsonFormEditor.vue'
 import DiffPreviewDialog from '@/components/config/DiffPreviewDialog.vue'
+import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -52,15 +55,24 @@ const {
   has_messages_changes,
 } = storeToRefs(config_store)
 
+const {
+  config_items,
+  config_items_loading,
+  saving_config_item,
+} = storeToRefs(extension_store)
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
 const active_tab = ref(
-  ['toml', 'env', 'messages'].includes(route.query.tab) ? route.query.tab : 'toml',
+  ['toml', 'env', 'messages', 'extensions'].includes(route.query.tab) ? route.query.tab : 'toml',
 )
 const active_group = ref('')
 const active_env_group = ref('')
+const active_extension_id = ref('')
+/** 扩展配置是否已尝试加载（避免首帧误显示空状态） */
+const extensions_loaded = ref(false)
 const diff_open = ref(false)
 const env_diff_open = ref(false)
 const raw_editor_open = ref(false)
@@ -74,6 +86,7 @@ const tabs = computed(() => [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
   { value: 'env', label: t('config_view.tab_env'), icon: 'lucide:terminal' },
   { value: 'messages', label: t('config_view.tab_messages'), icon: 'lucide:message-square' },
+  { value: 'extensions', label: t('config_view.tab_extensions'), icon: 'lucide:puzzle' },
 ])
 
 const groups = computed(() => schema.value?.groups || [])
@@ -119,6 +132,78 @@ const active_group_gate_label = computed(() => {
   return schema.value?.fields?.find((field) => field.key === gate_key)?.label || gate_key
 })
 
+/** 有配置项的扩展列表（代码扩展 + 无代码模板包） */
+const extension_items = computed(() => config_items.value)
+
+/** 当前选中的扩展配置项 */
+const active_extension_item = computed(
+  () => extension_items.value.find((item) => item.id === active_extension_id.value) || null,
+)
+
+/** 扩展类型显示名（复用扩展管理的语言键） */
+const extension_type_labels = computed(() => ({
+  api: t('extensions.type_api'),
+  command: t('extensions.type_command'),
+  renderer: t('extensions.type_renderer'),
+  template: t('extensions.type_template'),
+  resources: t('extensions.type_resources'),
+}))
+
+/** 扩展状态显示名（复用扩展管理的语言键） */
+const extension_state_labels = computed(() => ({
+  loaded: t('extensions.state_loaded'),
+  enabled: t('extensions.state_enabled'),
+  discovered: t('extensions.state_discovered'),
+  validated: t('extensions.state_validated'),
+  failed: t('extensions.state_failed'),
+  disabled: t('extensions.state_disabled'),
+  blocked: t('extensions.state_blocked'),
+}))
+
+const extension_state_variants = {
+  loaded: 'success',
+  enabled: 'success',
+  discovered: 'neutral',
+  validated: 'neutral',
+  failed: 'danger',
+  disabled: 'neutral',
+  blocked: 'warning',
+}
+
+/** 选中首个扩展（优先 URL query 指定的 extension，无效则回退第一项） */
+function select_default_extension() {
+  const query_extension = route.query.extension
+  const matched =
+    typeof query_extension === 'string' &&
+    extension_items.value.some((item) => item.id === query_extension)
+  active_extension_id.value = matched ? query_extension : extension_items.value[0].id
+}
+
+async function ensure_extensions() {
+  if (extension_items.value.length > 0) {
+    extensions_loaded.value = true
+    if (!active_extension_item.value) select_default_extension()
+    return
+  }
+  try {
+    await extension_store.fetch_config_items()
+    if (extension_items.value.length > 0) select_default_extension()
+  } catch (error) {
+    toast.error(error.message || t('config_view.toast_load_extensions_failed'))
+  } finally {
+    extensions_loaded.value = true
+  }
+}
+
+async function save_extension_item(item, values) {
+  try {
+    await extension_store.save_config_item(item.id, values)
+    toast.success(t('extensions.config_save_success', { name: item.name }))
+  } catch (error) {
+    toast.error(error.message || t('extensions.config_save_failed'))
+  }
+}
+
 onMounted(async () => {
   try {
     await config_store.fetch_all()
@@ -149,21 +234,27 @@ onMounted(async () => {
     // 环境变量加载失败不阻塞页面
   }
   if (active_tab.value === 'messages') ensure_messages()
+  if (active_tab.value === 'extensions') ensure_extensions()
 })
 
 // 切换 tab / group 时同步到 URL query，便于分享与刷新保持
 watch(active_tab, (val) => {
   sync_query({ tab: val })
   if (val === 'messages') ensure_messages()
+  if (val === 'extensions') ensure_extensions()
 })
 watch(active_env_group, (val) => {
   if (active_tab.value === 'env') sync_query({ group: val })
 })
+watch(active_extension_id, (val) => {
+  if (active_tab.value === 'extensions') sync_query({ extension: val })
+})
 
 function sync_query(patch) {
   const query = { ...route.query, ...patch }
-  // 非当前 tab 的 group 信息不保留
+  // 非当前 tab 的 group / extension 信息不保留
   if (patch.tab && patch.tab !== 'env') delete query.group
+  if (patch.tab && patch.tab !== 'extensions') delete query.extension
   router.replace({ query })
 }
 
@@ -847,6 +938,80 @@ async function confirm_messages_save() {
           </div>
         </section>
       </template>
+
+      <!-- 扩展配置 -->
+      <template #extensions>
+        <div class="tab-actions">
+          <span class="text-xs text-muted tab-action-left">
+            {{ t('config_view.tab_extensions_hint') }}
+          </span>
+        </div>
+
+        <div v-if="config_items_loading || !extensions_loaded" class="card">
+          <div class="loading-block">
+            <Spinner :size="18" /> {{ t('config_view.tab_extensions_loading') }}
+          </div>
+        </div>
+
+        <EmptyState
+          v-else-if="extension_items.length === 0"
+          icon="lucide:puzzle"
+          :title="t('config_view.tab_extensions_empty_title')"
+          :description="t('config_view.tab_extensions_empty_description')"
+        />
+
+        <div v-else class="config-layout">
+          <nav class="group-nav card">
+            <button
+              v-for="item in extension_items"
+              :key="item.id"
+              class="group-item"
+              :class="{ 'group-item--active': active_extension_id === item.id }"
+              @click="active_extension_id = item.id"
+            >
+              <span class="group-item-name">{{ item.name }}</span>
+            </button>
+          </nav>
+
+          <section v-if="active_extension_item" class="card config-panel">
+            <div class="card-header extension-panel-header">
+              <div class="extension-panel-title">
+                <h3 class="card-title">{{ active_extension_item.name }}</h3>
+                <span class="mono text-muted">{{ active_extension_item.id }}</span>
+              </div>
+              <div class="extension-panel-badges">
+                <Badge
+                  v-for="type in active_extension_item.types || []"
+                  :key="type"
+                  variant="accent"
+                >
+                  {{ extension_type_labels[type] || type }}
+                </Badge>
+                <Badge
+                  :variant="extension_state_variants[active_extension_item.state] || 'neutral'"
+                >
+                  {{
+                    extension_state_labels[active_extension_item.state] ||
+                    active_extension_item.state
+                  }}
+                </Badge>
+              </div>
+            </div>
+            <p v-if="active_extension_item.description" class="field-desc extension-panel-desc">
+              {{ active_extension_item.description }}
+            </p>
+            <div class="extension-panel-form">
+              <ExtensionConfigForm
+                :key="active_extension_item.id"
+                :schema="active_extension_item.schema"
+                :values="active_extension_item.values"
+                :saving="saving_config_item === active_extension_item.id"
+                @save="(values) => save_extension_item(active_extension_item, values)"
+              />
+            </div>
+          </section>
+        </div>
+      </template>
     </Tabs>
 
     <!-- 源码编辑弹窗：按当前 tab 编辑对应文件的原始文本 -->
@@ -1026,6 +1191,47 @@ async function confirm_messages_save() {
   height: 6px;
   border-radius: 50%;
   background: var(--warning);
+}
+
+.group-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 扩展配置面板头部 */
+.extension-panel-header {
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.extension-panel-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.extension-panel-title .card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-panel-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.extension-panel-desc {
+  padding: 0 var(--space-5);
+}
+
+.extension-panel-form {
+  padding: var(--space-2) var(--space-5) var(--space-5);
 }
 
 /* 字段行 */
