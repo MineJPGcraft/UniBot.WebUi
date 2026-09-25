@@ -4,6 +4,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { http } from '@/utils/http'
+import { t_global } from '@/i18n'
+import { useTaskStore } from '@/stores/task'
 
 export const useExtensionStore = defineStore('extension', () => {
   const installed_list = ref([])
@@ -171,26 +173,24 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
+  /** 从市场安装扩展：提交后台任务，进度在任务中心查看 */
   async function install_market(extension_id, version = '') {
-    // 下载 + 解压安装耗时较长，放宽超时
-    await http.post(
-      '/api/extensions/market/install',
-      { id: extension_id, version },
-      { timeout_ms: 60000 },
-    )
+    const task = await http.post('/api/extensions/market/install', { id: extension_id, version })
     await fetch_market()
-    await fetch_installed()
+    return task
   }
 
+  /** 卸载扩展：提交后台任务，进度在任务中心查看 */
   async function uninstall_extension(extension_id) {
-    await http.delete(`/api/extensions/${encodeURIComponent(extension_id)}`)
+    const task = await http.delete(`/api/extensions/${encodeURIComponent(extension_id)}`)
     await fetch_installed()
+    return task
   }
 
-  /** 热重载全部扩展（安装/卸载/启停后立即生效，无需重启 Bot） */
+  /** 热重载全部扩展（安装/卸载/启停后立即生效，无需重启 Bot）：提交后台任务 */
   async function reload() {
-    await http.post('/api/extensions/reload', {})
-    await fetch_installed()
+    const task = await http.post('/api/extensions/reload', {})
+    return task
   }
 
   /** 获取图片模式依赖扩展（Html2Pic / Default）的下载情况 */
@@ -215,14 +215,22 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
-  /** 下载（如缺失）并启动 Extension Studio，返回访问地址（含 token） */
+  /**
+   * 下载（如缺失）并启动 Extension Studio。
+   *
+   * 后端以任务中心任务执行（下载可能较慢），此处等待任务结束，
+   * 再返回任务结果中的访问地址（含登录 token）。
+   */
   async function launch_studio() {
     studio_launching.value = true
     try {
-      // 后端等待 Studio 就绪最长约 35s，放宽前端超时
-      const data = await http.post('/api/extensions/studio/launch', {}, { timeout_ms: 90000 })
+      const task = await http.post('/api/extensions/studio/launch', {})
+      const finished = await useTaskStore().wait_task(task.id)
       await fetch_studio_status()
-      return data?.url || ''
+      if (finished?.status !== 'succeeded') {
+        throw new Error(finished?.error || t_global('extensions.studio_launch_failed'))
+      }
+      return finished.result?.url || ''
     } finally {
       studio_launching.value = false
     }

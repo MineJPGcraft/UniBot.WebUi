@@ -103,9 +103,7 @@
     "config_fetch_failed": "获取扩展配置失败",
     "config_dialog_default_name": "扩展",
     "config_dialog_title": "{name} 配置",
-    "config_dialog_open_config_page": "在配置中心打开",
-    "installed_install_reload_failed": "扩展 {name} 已安装，但热重载失败，请重启机器人生效",
-    "installed_uninstall_reload_failed": "扩展 {name} 已卸载，但热重载失败，请重启机器人生效"
+    "config_dialog_open_config_page": "在配置中心打开"
   },
   "en": {
     "page_title": "Extensions",
@@ -211,8 +209,6 @@
     "config_fetch_failed": "Failed to load extension configuration",
     "config_dialog_default_name": "Extension",
     "config_dialog_title": "{name} Settings",
-    "config_dialog_open_config_page": "Open in Configuration Center",
-    "installed_install_reload_failed": "Extension {name} installed, but hot reload failed. Please restart the bot.",
-    "installed_uninstall_reload_failed": "Extension {name} uninstalled, but hot reload failed. Please restart the bot."
+    "config_dialog_open_config_page": "Open in Configuration Center"
   }
 }

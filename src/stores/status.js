@@ -28,11 +28,12 @@ export const useStatusStore = defineStore('status', () => {
     return data
   }
 
-  /** 从 GitHub Release 更新机器人（成功后后端会触发重启） */
+  /**
+   * 从 GitHub Release 更新机器人（提交任务中心任务，下载完成后由后端触发重启）。
+   * 进度在任务中心查看。
+   */
   async function update_bot() {
-    // 下载完整发布包耗时较长，大幅放宽超时
-    const data = await http.post('/api/status/update', {}, { timeout_ms: 120000 })
-    return data
+    return await http.post('/api/status/update')
   }
 
   /** 获取当前认证令牌（用于快速授权初始化） */

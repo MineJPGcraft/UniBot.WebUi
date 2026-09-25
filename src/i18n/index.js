@@ -22,6 +22,7 @@ import settings from './messages/settings.json'
 import setup from './messages/setup.json'
 import statistics from './messages/statistics.json'
 import logs from './messages/logs.json'
+import task_center from './messages/task_center.json'
 import ui from './messages/ui.json'
 
 /** 支持的语言清单（切换器渲染用） */
@@ -49,6 +50,7 @@ const MESSAGE_MODULES = {
   setup,
   statistics,
   logs,
+  task_center,
   ui,
 }
 

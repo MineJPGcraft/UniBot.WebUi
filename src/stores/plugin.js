@@ -1,5 +1,9 @@
 /**
  * 插件 Store：已安装插件与插件市场
+ *
+ * 安装/升级/卸载都涉及依赖变更（uv add / uv remove），后端以任务中心任务执行，
+ * 接口立即返回任务快照。等待任务结束与重启询问统一交给
+ * `composables/use_task_submit.js`，本 store 只负责请求与列表刷新。
  */
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
@@ -32,9 +36,11 @@ export const usePluginStore = defineStore('plugin', () => {
     await fetch_installed()
   }
 
+  /** 提交卸载任务并刷新列表，返回任务快照 */
   async function remove_plugin(module_name) {
-    await http.delete(`/api/plugins/${encodeURIComponent(module_name)}`)
+    const task = await http.delete(`/api/plugins/${encodeURIComponent(module_name)}`)
     await Promise.all([fetch_installed(), fetch_registered_plugins()])
+    return task
   }
 
   async function fetch_registered_plugins() {
@@ -61,12 +67,18 @@ export const usePluginStore = defineStore('plugin', () => {
     await fetch_market({ page, page_size: market_page_size.value })
   }
 
+  /** 从市场安装插件：提交后台任务并刷新列表，返回任务快照 */
   async function install_plugin(name, version) {
-    return await http.post('/api/plugins/market/install', { name, version })
+    const task = await http.post('/api/plugins/market/install', { name, version })
+    await Promise.all([fetch_installed(), fetch_registered_plugins()])
+    return task
   }
 
+  /** 升级已安装插件：提交后台任务并刷新列表，返回任务快照 */
   async function upgrade_plugin(name) {
-    return await http.post('/api/plugins/market/upgrade', { name })
+    const task = await http.post('/api/plugins/market/upgrade', { name })
+    await Promise.all([fetch_installed(), fetch_registered_plugins()])
+    return task
   }
 
   return {

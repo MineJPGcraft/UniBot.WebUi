@@ -7,6 +7,7 @@ import { usePluginStore } from '@/stores/plugin'
 import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
 import { use_restart } from '@/composables/use_restart'
+import { use_task_submit } from '@/composables/use_task_submit'
 import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -19,6 +20,7 @@ const auth_store = useAuthStore()
 const { t } = useI18n()
 const toast = use_toast()
 const { ask_restart } = use_restart()
+const { submit_task, maybe_ask_restart } = use_task_submit()
 const {
   installed_list,
   registered_plugin_modules,
@@ -90,14 +92,15 @@ function can_remove_plugin(plugin) {
 async function remove_plugin(plugin) {
   const display_name = plugin.display_name || plugin.name
   removing_item.value = plugin.module_name
-  try {
-    await plugin_store.remove_plugin(plugin.module_name)
+  const task = await submit_task(
+    () => plugin_store.remove_plugin(plugin.module_name),
+    t('plugins.remove_failed'),
+  )
+  removing_item.value = ''
+  if (task) {
     toast.success(t('plugins.remove_success', { name: display_name }))
-    ask_restart(t('plugins.restart_after_remove_confirm', { name: display_name }))
-  } catch (error) {
-    toast.error(error.message || t('plugins.remove_failed'))
-  } finally {
-    removing_item.value = ''
+    // 依赖卸载完成后才询问是否重启（task.result.restart_required 由后端标记）
+    maybe_ask_restart(task, t('plugins.restart_after_remove_confirm', { name: display_name }))
   }
 }
 
@@ -119,29 +122,29 @@ async function go_market_page(page) {
 
 async function install_market_plugin(item) {
   market_action.value = item.module_name
-  try {
-    await plugin_store.install_plugin(item.project_link)
+  const task = await submit_task(
+    () => plugin_store.install_plugin(item.project_link),
+    t('plugins.install_failed'),
+  )
+  market_action.value = ''
+  if (task) {
     toast.success(t('plugins.install_success', { name: item.name }))
     await refresh_after_market_action()
-    ask_restart(t('plugins.restart_after_install_confirm', { name: item.name }))
-  } catch (error) {
-    toast.error(error.message || t('plugins.install_failed'))
-  } finally {
-    market_action.value = ''
+    maybe_ask_restart(task, t('plugins.restart_after_install_confirm', { name: item.name }))
   }
 }
 
 async function upgrade_market_plugin(item) {
   market_action.value = item.module_name
-  try {
-    await plugin_store.upgrade_plugin(item.project_link)
+  const task = await submit_task(
+    () => plugin_store.upgrade_plugin(item.project_link),
+    t('plugins.upgrade_failed'),
+  )
+  market_action.value = ''
+  if (task) {
     toast.success(t('plugins.upgrade_success', { name: item.name }))
     await refresh_after_market_action()
-    ask_restart(t('plugins.restart_after_upgrade_confirm', { name: item.name }))
-  } catch (error) {
-    toast.error(error.message || t('plugins.upgrade_failed'))
-  } finally {
-    market_action.value = ''
+    maybe_ask_restart(task, t('plugins.restart_after_upgrade_confirm', { name: item.name }))
   }
 }
 

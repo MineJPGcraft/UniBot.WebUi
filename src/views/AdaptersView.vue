@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
 import { use_async_action } from '@/composables/use_async_action'
 import { use_restart } from '@/composables/use_restart'
+import { use_task_submit } from '@/composables/use_task_submit'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -21,6 +22,7 @@ const { t } = useI18n()
 const toast = use_toast()
 const { run } = use_async_action()
 const { ask_restart } = use_restart()
+const { submit_task, maybe_ask_restart } = use_task_submit()
 const router = useRouter()
 const { registered_list, catalog, loading } = storeToRefs(adapter_store)
 
@@ -57,11 +59,15 @@ onMounted(async () => {
 
 async function install_adapter(adapter) {
   installing_adapter.value = adapter.id
-  const ok = await run(() => adapter_store.install(adapter.id), t('adapters.install_failed'))
+  const task = await submit_task(
+    () => adapter_store.install(adapter.id),
+    t('adapters.install_failed'),
+  )
   installing_adapter.value = ''
-  if (ok) {
+  if (task) {
     toast.success(t('adapters.install_success', { name: adapter.name }))
-    ask_restart(t('adapters.restart_after_install_confirm', { name: adapter.name }))
+    // 依赖安装完成后才询问是否重启（task.result.restart_required 由后端标记）
+    maybe_ask_restart(task, t('adapters.restart_after_install_confirm', { name: adapter.name }))
   }
 }
 
@@ -104,16 +110,16 @@ async function do_uninstall() {
   const adapter = pending_uninstall.value
   if (!adapter) return
   uninstalling_adapter.value = adapter.module_name
-  const ok = await run(
+  const task = await submit_task(
     () => adapter_store.uninstall(adapter.name, adapter.module_name),
     t('adapters.uninstall_failed'),
   )
   uninstalling_adapter.value = ''
-  if (ok) {
+  if (task) {
     toast.success(t('adapters.uninstall_success', { name: adapter.name }))
     uninstall_dialog_open.value = false
     pending_uninstall.value = null
-    ask_restart(t('adapters.restart_after_uninstall_confirm', { name: adapter.name }))
+    maybe_ask_restart(task, t('adapters.restart_after_uninstall_confirm', { name: adapter.name }))
   }
 }
 </script>

@@ -1,5 +1,9 @@
 /**
  * 适配器 Store：适配器目录、注册状态与安装管理
+ *
+ * 安装/卸载会触发依赖变更（uv add / uv remove），后端以任务中心任务执行，
+ * 接口立即返回任务快照。等待任务结束与重启询问统一交给
+ * `composables/use_task_submit.js`，本 store 只负责请求与列表刷新。
  */
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
@@ -21,10 +25,11 @@ export const useAdapterStore = defineStore('adapter', () => {
     }
   }
 
+  /** 提交安装任务，返回任务快照 */
   async function install(adapter_id) {
-    const result = await http.post('/api/config/nonebot/adapters/install', { adapter_id })
+    const task = await http.post('/api/config/nonebot/adapters/install', { adapter_id })
     await fetch_all()
-    return result
+    return task
   }
 
   async function toggle_register(name, module_name, register) {
@@ -36,11 +41,13 @@ export const useAdapterStore = defineStore('adapter', () => {
     await fetch_all()
   }
 
+  /** 提交卸载任务，返回任务快照 */
   async function uninstall(name, module_name) {
-    await http.delete('/api/config/nonebot/adapters/uninstall', {
+    const task = await http.delete('/api/config/nonebot/adapters/uninstall', {
       body: { name, module_name },
     })
     await fetch_all()
+    return task
   }
 
   return {

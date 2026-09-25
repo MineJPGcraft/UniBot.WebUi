@@ -9,6 +9,7 @@ import { useThemeStore } from '@/stores/theme'
 import { use_websocket } from '@/composables/use_websocket'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
+import TaskCenterDrawer from './TaskCenterDrawer.vue'
 import { current_locale, set_locale, LOCALES } from '@/i18n'
 import { role_label } from '@/utils/format'
 
@@ -75,6 +76,8 @@ function toggle_locale() {
           <span class="ws-dot" :class="ws_dot_class" />
         </span>
       </Tooltip>
+
+      <TaskCenterDrawer />
 
       <Tooltip :text="t('nav.switch_language')">
         <button class="locale-toggle" @click="toggle_locale">

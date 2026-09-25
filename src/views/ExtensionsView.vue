@@ -9,6 +9,7 @@ import { useConfigStore } from '@/stores/config'
 import { use_toast } from '@/composables/use_toast'
 import { use_async_action } from '@/composables/use_async_action'
 import { use_restart } from '@/composables/use_restart'
+import { use_task_submit } from '@/composables/use_task_submit'
 import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -28,6 +29,7 @@ const config_store = useConfigStore()
 const toast = use_toast()
 const { run } = use_async_action()
 const { ask_restart } = use_restart()
+const { submit_task } = use_task_submit()
 const {
   installed_list,
   loading,
@@ -174,38 +176,26 @@ const filtered_market_items = computed(() => {
 
 async function install_market_extension(item) {
   market_action.value = item.id
-  try {
-    await extension_store.install_market(item.id)
-    // 先热重载让扩展进入注册表，再刷新市场列表（「已安装」状态实时计算自注册表）
-    const reloaded = await run(
-      () => extension_store.reload(),
-      t('extensions.installed_install_reload_failed', { name: item.name }),
-    )
+  // 后端在任务中心串行完成下载 → 依赖同步 → 热重载，此处等任务结束并刷新列表
+  const task = await submit_task(
+    () => extension_store.install_market(item.id),
+    t('extensions.installed_install_failed'),
+  )
+  market_action.value = ''
+  if (task) {
     await search_market()
-    if (reloaded) {
-      toast.success(t('extensions.installed_install_success', { name: item.name }))
-    }
-  } catch (error) {
-    toast.error(error.message || t('extensions.installed_install_failed'))
-  } finally {
-    market_action.value = ''
+    toast.success(t('extensions.installed_install_success', { name: item.name }))
   }
 }
 
 async function uninstall_extension(extension) {
-  try {
-    await extension_store.uninstall_extension(extension.id)
-    // 先热重载让扩展从注册表移除，再刷新市场列表（「已安装」状态实时计算自注册表）
-    const reloaded = await run(
-      () => extension_store.reload(),
-      t('extensions.installed_uninstall_reload_failed', { name: extension.name }),
-    )
+  const task = await submit_task(
+    () => extension_store.uninstall_extension(extension.id),
+    t('extensions.installed_uninstall_failed'),
+  )
+  if (task) {
     await search_market()
-    if (reloaded) {
-      toast.success(t('extensions.installed_uninstall_success', { name: extension.name }))
-    }
-  } catch (error) {
-    toast.error(error.message || t('extensions.installed_uninstall_failed'))
+    toast.success(t('extensions.installed_uninstall_success', { name: extension.name }))
   }
 }
 
