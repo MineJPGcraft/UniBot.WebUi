@@ -1,6 +1,6 @@
 <script setup>
 /**
- * 扩展配置弹窗：复用 ExtensionConfigForm 动态表单。
+ * 扩展配置弹窗：复用通用 SchemaForm 动态表单。
  *
  *    与配置中心一致的交互：保存操作位于表单右上角操作栏（含改动计数），
  *    无改动时「取消」与「保存」均不可用；操作栏左侧提供「在配置中心打开」
@@ -12,7 +12,7 @@ import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 import Dialog from '@/components/ui/Dialog.vue'
 import Button from '@/components/ui/Button.vue'
-import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
+import SchemaForm from '@/components/ui/SchemaForm.vue'
 
 const props = defineProps({
   extension: { type: Object, default: null },
@@ -52,7 +52,7 @@ function open_in_config_page() {
     hide-footer
     width="70vw"
   >
-    <ExtensionConfigForm
+    <SchemaForm
       :schema="schema"
       :values="values"
       :loading="loading"
@@ -72,6 +72,6 @@ function open_in_config_page() {
           {{ t('extensions.config_dialog_open_config_page') }}
         </Button>
       </template>
-    </ExtensionConfigForm>
+    </SchemaForm>
   </Dialog>
 </template>

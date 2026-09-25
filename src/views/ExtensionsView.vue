@@ -19,7 +19,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import MarketPanel from '@/components/MarketPanel.vue'
 import ExtensionConfigDialog from '@/components/ExtensionConfigDialog.vue'
-import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
+import SchemaForm from '@/components/ui/SchemaForm.vue'
 
 const { t } = useI18n()
 const extension_store = useExtensionStore()
@@ -599,7 +599,7 @@ async function open_studio_log() {
                   {{ item.reason }}
                 </span>
               </div>
-              <ExtensionConfigForm
+              <SchemaForm
                 :schema="item.schema"
                 :values="item.values"
                 :saving="saving_render_config === item.id"

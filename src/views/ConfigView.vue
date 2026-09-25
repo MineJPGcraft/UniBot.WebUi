@@ -9,19 +9,14 @@ import { useExtensionStore } from '@/stores/extension'
 import { use_toast } from '@/composables/use_toast'
 import { use_restart } from '@/composables/use_restart'
 import Button from '@/components/ui/Button.vue'
-import Input from '@/components/ui/Input.vue'
-import Textarea from '@/components/ui/Textarea.vue'
-import Select from '@/components/ui/Select.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
-import JsonFormEditor from '@/components/ui/JsonFormEditor.vue'
+import SchemaForm from '@/components/ui/SchemaForm.vue'
 import DiffPreviewDialog from '@/components/config/DiffPreviewDialog.vue'
-import ExtensionConfigForm from '@/components/ExtensionConfigForm.vue'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -30,6 +25,8 @@ const toast = use_toast()
 const { ask_restart } = use_restart()
 const {
   schema,
+  groups,
+  config_data,
   draft,
   loading,
   saving,
@@ -37,7 +34,7 @@ const {
   has_changes,
   env_schema,
   env_groups,
-  env_draft,
+  env_values,
   env_loading,
   env_saving,
   env_changes,
@@ -74,14 +71,15 @@ const env_diff_open = ref(false)
 const raw_editor_open = ref(false)
 const raw_editor_target = ref('toml')
 const raw_loaded = ref(false)
-const json_errors = ref({})
-const platform_item_ids = ref({})
-let platform_item_sequence = 0
 
 /** 扩展配置表单引用（操作栏外置到 tab-actions，经 ref 触发表单保存/撤销） */
 const extension_form_ref = ref(null)
 /** 当前扩展配置的改动字段数量（由表单 change 事件同步） */
 const extension_config_changes = ref(0)
+
+/** Config.toml / .env 表单引用：操作栏外置，撤销需同时清空 store 草稿与表单内部草稿 */
+const config_form_ref = ref(null)
+const env_form_ref = ref(null)
 
 const tabs = computed(() => [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
@@ -89,8 +87,6 @@ const tabs = computed(() => [
   { value: 'messages', label: t('config_view.tab_messages'), icon: 'lucide:message-square' },
   { value: 'extensions', label: t('config_view.tab_extensions'), icon: 'lucide:puzzle' },
 ])
-
-const groups = computed(() => schema.value?.groups || [])
 
 /** 当前分组对象（含 keys / gated_by 等元信息） */
 const active_group_data = computed(
@@ -130,7 +126,7 @@ const active_group_locked = computed(() => {
 const active_group_gate_label = computed(() => {
   const gate_key = active_group_data.value.gated_by
   if (!gate_key) return ''
-  return schema.value?.fields?.find((field) => field.key === gate_key)?.label || gate_key
+  return field_title(gate_key)
 })
 
 /** 有配置项的扩展列表（代码扩展 + 无代码模板包） */
@@ -264,123 +260,45 @@ function sync_query(patch) {
   router.replace({ query })
 }
 
-function fields_of(group) {
-  return (schema.value?.fields || []).filter((field) => group.keys.includes(field.key))
+/** 字段显示名（用于锁定提示等文案） */
+function field_title(key) {
+  return schema.value?.properties?.[key]?.title || key
 }
 
-function env_fields_of(group) {
-  return env_schema.value.filter((field) => group.keys.includes(field.key))
+/** 当前分组显示名 */
+const active_group_name = computed(() => active_group_data.value.name || active_group.value)
+
+/** 撤销 Config.toml 改动：清空 store 草稿并重建表单内部草稿 */
+async function revert_config_changes() {
+  config_store.reset_draft()
+  await nextTick()
+  config_form_ref.value?.reset_draft()
 }
+
+/** 撤销 .env 改动：清空 store 草稿并重建表单内部草稿 */
+async function revert_env_changes() {
+  config_store.reset_env_draft()
+  await nextTick()
+  env_form_ref.value?.reset_draft()
+}
+
+/** 当前环境变量分组显示名 */
+const active_env_group_name = computed(
+  () => active_env_group_data.value.name || active_env_group.value,
+)
 
 function draft_value(key) {
   return get_nested(draft.value, key)
 }
 
-function env_draft_value(key) {
-  return env_draft.value[key]
-}
-
-function handle_update(key, value) {
+/** Config.toml 表单草稿同步（字段级，避免整表重建） */
+function handle_config_update(key, value) {
   config_store.update_field(key, value)
 }
 
+/** .env 表单草稿同步（字段级，避免整表重建） */
 function handle_env_update(key, value) {
   config_store.update_env_field(key, value)
-}
-
-// 列表编辑器（Config.toml）
-function add_list_item(key) {
-  const current = draft_value(key)
-  handle_update(key, [...(current || []), ''])
-}
-
-function update_list_item(key, index, value) {
-  const current = [...(draft_value(key) || [])]
-  current[index] = value
-  handle_update(key, current)
-}
-
-function remove_list_item(key, index) {
-  const current = [...(draft_value(key) || [])]
-  current.splice(index, 1)
-  remove_item_id(key, index)
-  handle_update(key, current)
-}
-
-function platform_item_key(key, index) {
-  const item_ids = platform_item_ids.value[key] || []
-  while (item_ids.length <= index) {
-    platform_item_sequence += 1
-    item_ids.push(`${key}-${platform_item_sequence}`)
-  }
-  platform_item_ids.value[key] = item_ids
-  return item_ids[index]
-}
-
-/** 普通列表项的稳定 key（与平台列表共用同一 id 簿记，删除中间项时输入不串位） */
-const list_item_key = platform_item_key
-
-function split_platform_item(item, fallback = '') {
-  const separator = String(item || '').indexOf(':')
-  if (separator < 0) return { platform: fallback, target: String(item || '') }
-  return { platform: item.slice(0, separator), target: item.slice(separator + 1) }
-}
-
-function add_platform_item(field) {
-  const platform = field.options?.[0]?.value || ''
-  handle_update(field.key, [...(draft_value(field.key) || []), `${platform}:`])
-}
-
-function remove_platform_item(key, index) {
-  // remove_list_item 内部已同步清理稳定 key 簿记
-  remove_list_item(key, index)
-}
-
-/** 删除列表项时同步移除其稳定 key，保持 id 簿记与列表对齐 */
-function remove_item_id(key, index) {
-  const item_ids = platform_item_ids.value[key] || []
-  item_ids.splice(index, 1)
-  platform_item_ids.value[key] = item_ids
-}
-
-function update_platform_item(field, index, property, value) {
-  const current = [...(draft_value(field.key) || [])]
-  const item = split_platform_item(current[index], field.options?.[0]?.value || '')
-  item[property] = value
-  current[index] = `${item.platform}:${item.target}`
-  handle_update(field.key, current)
-}
-
-function json_value(key) {
-  return JSON.stringify(env_draft_value(key) ?? [], null, 2)
-}
-
-function handle_json_update(key, value) {
-  try {
-    handle_env_update(key, JSON.parse(value))
-    json_errors.value = { ...json_errors.value, [key]: '' }
-  } catch {
-    json_errors.value = { ...json_errors.value, [key]: t('config_view.toast_invalid_json') }
-  }
-}
-
-// 列表编辑器（.env）
-function add_env_list_item(key) {
-  const current = env_draft_value(key)
-  handle_env_update(key, [...(current || []), ''])
-}
-
-function update_env_list_item(key, index, value) {
-  const current = [...(env_draft_value(key) || [])]
-  current[index] = value
-  handle_env_update(key, current)
-}
-
-function remove_env_list_item(key, index) {
-  const current = [...(env_draft_value(key) || [])]
-  current.splice(index, 1)
-  remove_item_id(key, index)
-  handle_env_update(key, current)
 }
 
 const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode']
@@ -575,7 +493,7 @@ async function confirm_messages_save() {
             <Icon icon="lucide:file-code" width="15" />
             {{ t('config_view.edit_source') }}
           </Button>
-          <Button variant="ghost" :disabled="!has_changes" @click="config_store.reset_draft()">
+          <Button variant="ghost" :disabled="!has_changes" @click="revert_config_changes">
             {{ t('config_view.revert_changes') }}
           </Button>
           <Button variant="primary" :disabled="!has_changes" @click="diff_open = true">
@@ -607,116 +525,19 @@ async function confirm_messages_save() {
 
           <section class="card config-panel">
             <div class="card-header">
-              <h3 class="card-title">{{ active_group }}</h3>
+              <h3 class="card-title">{{ active_group_name }}</h3>
             </div>
-            <div class="field-list" :class="{ 'field-list--locked': active_group_locked }">
-              <div
-                v-for="field in fields_of(active_group_data)"
-                :key="field.key"
-                class="field-row"
-                :class="{
-                  'field-row--changed': changed_keys.has(field.key),
-                  'field-row--gate':
-                    active_group_locked && field.key === active_group_data.gated_by,
-                }"
-              >
-                <div class="field-meta">
-                  <label class="field-label">
-                    {{ field.label }}
-                    <span class="mono field-key">{{ field.key }}</span>
-                  </label>
-                  <p class="field-desc">{{ field.description }}</p>
-                </div>
-
-                <div class="field-control">
-                  <Switch
-                    v-if="field.type === 'boolean'"
-                    :model-value="Boolean(draft_value(field.key))"
-                    @update:model-value="(value) => handle_update(field.key, value)"
-                  />
-                  <Input
-                    v-else-if="field.type === 'secret'"
-                    type="password"
-                    :model-value="draft_value(field.key) ?? ''"
-                    :placeholder="t('config_view.leave_empty_hint')"
-                    @update:model-value="(value) => handle_update(field.key, value)"
-                  />
-                  <Input
-                    v-else-if="field.type === 'number'"
-                    type="number"
-                    :model-value="draft_value(field.key) ?? 0"
-                    @update:model-value="(value) => handle_update(field.key, Number(value))"
-                  />
-                  <Textarea
-                    v-else-if="field.type === 'text'"
-                    :model-value="draft_value(field.key) ?? ''"
-                    @update:model-value="(value) => handle_update(field.key, value)"
-                  />
-                  <div v-else-if="field.type === 'list'" class="list-editor">
-                    <div
-                      v-for="(item, index) in draft_value(field.key) || []"
-                      :key="list_item_key(field.key, index)"
-                      class="list-item"
-                    >
-                      <Input
-                        :model-value="item"
-                        @update:model-value="(value) => update_list_item(field.key, index, value)"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon-only
-                        @click="remove_list_item(field.key, index)"
-                      >
-                        <Icon icon="lucide:x" width="14" />
-                      </Button>
-                    </div>
-                    <Button variant="secondary" size="sm" @click="add_list_item(field.key)">
-                      <Icon icon="lucide:plus" width="13" />
-                      {{ t('config_view.add_item') }}
-                    </Button>
-                  </div>
-                  <div v-else-if="field.type === 'platform_list'" class="list-editor">
-                    <div
-                      v-for="(item, index) in draft_value(field.key) || []"
-                      :key="platform_item_key(field.key, index)"
-                      class="platform-list-item"
-                    >
-                      <Select
-                        :model-value="split_platform_item(item, field.options?.[0]?.value).platform"
-                        :options="field.options || []"
-                        @update:model-value="
-                          (value) => update_platform_item(field, index, 'platform', value)
-                        "
-                      />
-                      <Input
-                        :model-value="split_platform_item(item).target"
-                        :placeholder="t('config_view.tab_basic_platform_target_placeholder')"
-                        @update:model-value="
-                          (value) => update_platform_item(field, index, 'target', value)
-                        "
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon-only
-                        @click="remove_platform_item(field.key, index)"
-                      >
-                        <Icon icon="lucide:x" width="14" />
-                      </Button>
-                    </div>
-                    <Button variant="secondary" size="sm" @click="add_platform_item(field)">
-                      <Icon icon="lucide:plus" width="13" />
-                      {{ t('config_view.tab_basic_platform_add_group') }}
-                    </Button>
-                  </div>
-                  <Input
-                    v-else
-                    :model-value="draft_value(field.key) ?? ''"
-                    @update:model-value="(value) => handle_update(field.key, value)"
-                  />
-                </div>
-              </div>
+            <div class="field-list">
+              <SchemaForm
+                ref="config_form_ref"
+                :schema="schema"
+                :fields="active_group_data.keys"
+                :values="config_data"
+                :nested="true"
+                :show-actions="false"
+                :locked-keys="active_group_locked ? [active_group_data.gated_by] : []"
+                @update="({ key, value }) => handle_config_update(key, value)"
+              />
               <div v-if="active_group_locked" class="field-lock-overlay" role="presentation">
                 <Icon icon="lucide:lock" width="18" />
                 <p class="field-lock-text">
@@ -735,11 +556,7 @@ async function confirm_messages_save() {
             <Icon icon="lucide:file-code" width="15" />
             {{ t('config_view.edit_source') }}
           </Button>
-          <Button
-            variant="ghost"
-            :disabled="!has_env_changes"
-            @click="config_store.reset_env_draft()"
-          >
+          <Button variant="ghost" :disabled="!has_env_changes" @click="revert_env_changes">
             {{ t('config_view.revert_changes') }}
           </Button>
           <Button variant="primary" :disabled="!has_env_changes" @click="env_diff_open = true">
@@ -771,94 +588,18 @@ async function confirm_messages_save() {
 
           <section class="card config-panel">
             <div class="card-header">
-              <h3 class="card-title">{{ active_env_group }}</h3>
+              <h3 class="card-title">{{ active_env_group_name }}</h3>
               <span class="text-xs text-muted">{{ t('config_view.tab_env_restart_hint') }}</span>
             </div>
             <div class="field-list">
-              <div
-                v-for="field in env_fields_of(active_env_group_data)"
-                :key="field.key"
-                class="field-row"
-                :class="{ 'field-row--changed': env_changed_keys.has(field.key) }"
-              >
-                <div class="field-meta">
-                  <label class="field-label">
-                    {{ field.label }}
-                    <span class="mono field-key">{{ field.key }}</span>
-                  </label>
-                  <p class="field-desc">{{ field.description }}</p>
-                </div>
-
-                <div class="field-control">
-                  <Switch
-                    v-if="field.type === 'boolean'"
-                    :model-value="Boolean(env_draft_value(field.key))"
-                    @update:model-value="(value) => handle_env_update(field.key, value)"
-                  />
-                  <Input
-                    v-else-if="field.type === 'secret'"
-                    type="password"
-                    :model-value="env_draft_value(field.key) ?? ''"
-                    :placeholder="t('config_view.leave_empty_hint')"
-                    @update:model-value="(value) => handle_env_update(field.key, value)"
-                  />
-                  <Input
-                    v-else-if="field.type === 'number'"
-                    type="number"
-                    :model-value="env_draft_value(field.key) ?? 0"
-                    @update:model-value="(value) => handle_env_update(field.key, Number(value))"
-                  />
-                  <div v-else-if="field.type === 'list'" class="list-editor">
-                    <div
-                      v-for="(item, index) in env_draft_value(field.key) || []"
-                      :key="list_item_key(field.key, index)"
-                      class="list-item"
-                    >
-                      <Input
-                        :model-value="item"
-                        @update:model-value="
-                          (value) => update_env_list_item(field.key, index, value)
-                        "
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon-only
-                        @click="remove_env_list_item(field.key, index)"
-                      >
-                        <Icon icon="lucide:x" width="14" />
-                      </Button>
-                    </div>
-                    <Button variant="secondary" size="sm" @click="add_env_list_item(field.key)">
-                      <Icon icon="lucide:plus" width="13" />
-                      {{ t('config_view.add_item') }}
-                    </Button>
-                  </div>
-                  <div v-else-if="field.type === 'json'" class="json-editor">
-                    <JsonFormEditor
-                      v-if="field.form"
-                      :form="field.form"
-                      :model-value="env_draft_value(field.key)"
-                      @update:model-value="(value) => handle_env_update(field.key, value)"
-                    />
-                    <template v-else>
-                      <Textarea
-                        :model-value="json_value(field.key)"
-                        :rows="6"
-                        @update:model-value="(value) => handle_json_update(field.key, value)"
-                      />
-                      <span v-if="json_errors[field.key]" class="json-error">{{
-                        json_errors[field.key]
-                      }}</span>
-                    </template>
-                  </div>
-                  <Input
-                    v-else
-                    :model-value="env_draft_value(field.key) ?? ''"
-                    @update:model-value="(value) => handle_env_update(field.key, value)"
-                  />
-                </div>
-              </div>
+              <SchemaForm
+                ref="env_form_ref"
+                :schema="env_schema"
+                :fields="active_env_group_data.keys"
+                :values="env_values"
+                :show-actions="false"
+                @update="({ key, value }) => handle_env_update(key, value)"
+              />
             </div>
           </section>
         </div>
@@ -1005,8 +746,13 @@ async function confirm_messages_save() {
           <section v-if="active_extension_item" class="card config-panel">
             <div class="card-header extension-panel-header">
               <div class="extension-panel-title">
-                <h3 class="card-title">{{ active_extension_item.name }}</h3>
-                <span class="mono text-muted">{{ active_extension_item.id }}</span>
+                <div class="extension-panel-title-line">
+                  <h3 class="card-title">{{ active_extension_item.name }}</h3>
+                  <span class="mono text-muted">{{ active_extension_item.id }}</span>
+                </div>
+                <p v-if="active_extension_item.description" class="extension-panel-desc">
+                  {{ active_extension_item.description }}
+                </p>
               </div>
               <div class="extension-panel-badges">
                 <Badge
@@ -1026,11 +772,8 @@ async function confirm_messages_save() {
                 </Badge>
               </div>
             </div>
-            <p v-if="active_extension_item.description" class="field-desc extension-panel-desc">
-              {{ active_extension_item.description }}
-            </p>
             <div class="extension-panel-form">
-              <ExtensionConfigForm
+              <SchemaForm
                 ref="extension_form_ref"
                 :key="active_extension_item.id"
                 :schema="active_extension_item.schema"
@@ -1237,7 +980,15 @@ async function confirm_messages_save() {
   gap: var(--space-3);
 }
 
+/* 标题区：名称 / ID 一行，描述紧随其下（均位于头部左侧栏） */
 .extension-panel-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.extension-panel-title-line {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
@@ -1259,47 +1010,22 @@ async function confirm_messages_save() {
 }
 
 .extension-panel-desc {
-  padding: 0 var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 .extension-panel-form {
-  padding: var(--space-2) var(--space-5) var(--space-5);
+  padding: var(--space-2) var(--space-4) var(--space-5);
 }
 
-/* 字段行 */
+/* 字段列表容器（字段行样式由 SchemaForm 提供） */
 .field-list {
-  padding: var(--space-2) var(--space-5);
+  padding: var(--space-2) var(--space-4);
   position: relative;
 }
 
-.field-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-6);
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.field-row:last-child {
-  border-bottom: none;
-}
-
-.field-row--changed {
-  background: linear-gradient(to right, var(--warning-soft), transparent 60%);
-  margin: 0 calc(-1 * var(--space-5));
-  padding-left: var(--space-5);
-  padding-right: var(--space-5);
-  border-radius: var(--radius);
-}
-
-/* 门控开关行：提升到锁定遮罩之上，保持可交互 */
-.field-row--gate {
-  position: relative;
-  z-index: 2;
-}
-
-/* 锁定遮罩：门控开关关闭时盖住不可编辑的字段 */
+/* 门控锁定遮罩：门控开关关闭时盖住不可编辑的字段 */
 .field-lock-overlay {
   position: absolute;
   inset: 0;
@@ -1319,84 +1045,6 @@ async function confirm_messages_save() {
 .field-lock-text {
   font-size: var(--text-sm);
   font-weight: 500;
-}
-
-.field-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.field-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.field-key {
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0 var(--space-1);
-}
-
-.field-desc {
-  margin-top: 2px;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.field-control {
-  width: 40%;
-  flex: 0 0 40%;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.field-control > :not(.list-editor):not(.ui-switch) {
-  width: 100%;
-}
-
-.list-editor {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-
-.list-item {
-  display: flex;
-  gap: var(--space-1);
-  width: 100%;
-}
-
-.platform-list-item {
-  display: grid;
-  grid-template-columns: 132px 1fr auto;
-  gap: var(--space-1);
-  width: 100%;
-}
-
-.platform-list-item :deep(.ui-select-trigger) {
-  width: 100%;
-  min-width: 0;
-}
-
-.json-editor {
-  width: 100%;
-}
-
-.json-error {
-  display: block;
-  margin-top: var(--space-1);
-  color: var(--danger);
-  font-size: var(--text-xs);
 }
 
 /* 图片模式依赖扩展引导 */

@@ -3,7 +3,7 @@ import Spinner from './Spinner.vue'
 
 defineProps({
   variant: { type: String, default: 'secondary' }, // primary | secondary | ghost | danger
-  size: { type: String, default: 'md' }, // md | sm
+  size: { type: String, default: 'md' }, // md | sm | xs
   loading: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   iconOnly: { type: Boolean, default: false },
@@ -15,7 +15,7 @@ defineProps({
     class="ui-button"
     :class="[
       `ui-button--${variant}`,
-      { 'ui-button--sm': size === 'sm', 'ui-button--icon': iconOnly },
+      { [`ui-button--${size}`]: size !== 'md', 'ui-button--icon': iconOnly },
     ]"
     :disabled="disabled || loading"
   >
@@ -96,6 +96,14 @@ defineProps({
   font-size: var(--text-xs);
 }
 
+/* 内联于字段行 / 列表末尾的最小尺寸（图标与文字间距同步收紧） */
+.ui-button--xs {
+  gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
 .ui-button--icon {
   width: 34px;
   padding: 0;
@@ -103,6 +111,10 @@ defineProps({
 
 .ui-button--icon.ui-button--sm {
   width: 28px;
+}
+
+.ui-button--icon.ui-button--xs {
+  width: 24px;
 }
 
 .ui-button:focus-visible {

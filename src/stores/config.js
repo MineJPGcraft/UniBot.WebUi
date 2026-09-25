@@ -1,5 +1,8 @@
 /**
  * 配置 Store：Config.toml 配置值、Schema 与 .env 环境变量
+ *
+ * 后端 Schema 统一为标准 JSON Schema（详见 UniBot/Scripts/Api/Config/Schema.py），
+ * 分组信息单独返回；本模块只负责取值/提交，控件语义由 utils/schema_form.js 判定。
  */
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
@@ -8,14 +11,15 @@ import { get_nested, set_nested } from '@/utils/format'
 
 export const useConfigStore = defineStore('config', () => {
   const config_data = ref(null)
-  const schema = ref(null)
+  const schema = ref(null) // Config.toml 的 JSON Schema
+  const groups = ref([]) // Config.toml 分组 [{ id, name, keys, gated_by? }]
   const draft = ref(null) // 编辑中的副本
   const loading = ref(false)
   const saving = ref(false)
 
   // .env 环境变量
   const env_values = ref({})
-  const env_schema = ref([])
+  const env_schema = ref(null) // .env 的 JSON Schema
   const env_groups = ref([])
   const env_draft = ref({})
   const env_loading = ref(false)
@@ -39,11 +43,11 @@ export const useConfigStore = defineStore('config', () => {
   const changes = computed(() => {
     if (!config_data.value || !draft.value || !schema.value) return []
     const result = []
-    for (const field of schema.value.fields) {
-      const old_value = get_nested(config_data.value, field.key)
-      const new_value = get_nested(draft.value, field.key)
+    for (const [key, field] of Object.entries(schema.value.properties || {})) {
+      const old_value = get_nested(config_data.value, key)
+      const new_value = get_nested(draft.value, key)
       if (JSON.stringify(old_value) !== JSON.stringify(new_value)) {
-        result.push({ key: field.key, label: field.label, old_value, new_value })
+        result.push({ key, label: field.title || key, old_value, new_value })
       }
     }
     return result
@@ -54,13 +58,13 @@ export const useConfigStore = defineStore('config', () => {
   /** env 草稿变更项 */
   const env_changes = computed(() => {
     const result = []
-    for (const field of env_schema.value) {
-      const old_value = env_values.value[field.key]
-      const new_value = env_draft.value[field.key]
+    for (const [key, field] of Object.entries(env_schema.value?.properties || {})) {
+      const old_value = env_values.value[key]
+      const new_value = env_draft.value[key]
       if (
         JSON.stringify(old_value ?? field.default) !== JSON.stringify(new_value ?? field.default)
       ) {
-        result.push({ key: field.key, label: field.label, old_value, new_value })
+        result.push({ key, label: field.title || key, old_value, new_value })
       }
     }
     return result
@@ -85,7 +89,8 @@ export const useConfigStore = defineStore('config', () => {
         http.get('/api/config/schema'),
       ])
       config_data.value = data
-      schema.value = schema_data
+      schema.value = schema_data.schema || null
+      groups.value = schema_data.groups || []
       draft.value = JSON.parse(JSON.stringify(data))
     } finally {
       loading.value = false
@@ -97,7 +102,7 @@ export const useConfigStore = defineStore('config', () => {
     try {
       const data = await http.get('/api/config/env')
       env_values.value = data.values || {}
-      env_schema.value = data.schema || []
+      env_schema.value = data.schema || null
       env_groups.value = data.groups || []
       env_draft.value = JSON.parse(JSON.stringify(data.values || {}))
     } finally {
@@ -222,6 +227,7 @@ export const useConfigStore = defineStore('config', () => {
   return {
     config_data,
     schema,
+    groups,
     draft,
     loading,
     saving,
