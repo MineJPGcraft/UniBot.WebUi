@@ -84,8 +84,8 @@ const env_form_ref = ref(null)
 const tabs = computed(() => [
   { value: 'toml', label: 'Config.toml', icon: 'lucide:file-cog' },
   { value: 'env', label: t('config_view.tab_env'), icon: 'lucide:terminal' },
-  { value: 'messages', label: t('config_view.tab_messages'), icon: 'lucide:message-square' },
   { value: 'extensions', label: t('config_view.tab_extensions'), icon: 'lucide:puzzle' },
+  { value: 'messages', label: t('config_view.tab_messages'), icon: 'lucide:message-square' },
 ])
 
 /** 当前分组对象（含 keys / gated_by 等元信息） */
