@@ -18,7 +18,7 @@ export const STATUS_VARIANTS = {
 /** 未结束的状态（可取消、需继续轮询） */
 export const ACTIVE_STATUSES = new Set(['pending', 'running'])
 
-/** 任务类型 → 图标（key 与后端 `Scripts/Constants.py` 的 `TASK_*` 常量一致） */
+/** 任务类型 → 图标（key 与后端 `Scripts/Constants.py` 的 `TaskKind` 枚举成员值一致） */
 const KIND_ICONS = {
   dependency_sync: 'lucide:package-search',
   extension_install: 'lucide:puzzle',

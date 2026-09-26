@@ -57,6 +57,8 @@ const {
 
 const active_tab = ref('installed')
 const toggling = ref('')
+/** 重新加载扩展操作中的标志 */
+const reloading = ref(false)
 const config_open = ref(false)
 const active_extension = ref(null)
 const market_keyword = ref('')
@@ -155,6 +157,19 @@ onMounted(async () => {
 
 async function refresh_installed() {
   await run(() => extension_store.fetch_installed(), t('extensions.installed_fetch_list_failed'))
+}
+
+/** 热重载全部扩展：提交后台任务，进度在任务中心查看 */
+async function reload_extensions() {
+  reloading.value = true
+  try {
+    const task = await submit_task(() => extension_store.reload(), t('extensions.reload_failed'))
+    if (!task) return
+    await refresh_installed()
+    toast.success(t('extensions.reload_success'))
+  } finally {
+    reloading.value = false
+  }
 }
 
 async function search_market() {
@@ -360,6 +375,16 @@ async function open_studio_log() {
         <p class="page-desc">{{ t('extensions.page_description') }}</p>
       </div>
       <div class="page-actions">
+        <Button
+          variant="ghost"
+          :loading="reloading"
+          :disabled="!auth_store.is_admin"
+          :title="t('extensions.reload_button_title')"
+          @click="reload_extensions"
+        >
+          <Icon icon="lucide:refresh-cw" width="16" />
+          {{ t('extensions.reload_button') }}
+        </Button>
         <Button
           v-if="studio_status?.running"
           variant="ghost"
