@@ -173,11 +173,21 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
-  /** 从市场安装扩展：提交后台任务，进度在任务中心查看 */
-  async function install_market(extension_id, version = '') {
+  /**
+   * 从市场安装扩展：提交后台任务，进度在任务中心查看。
+   *
+   * `version` 为 null 表示自动选择兼容当前核心版本的最新历史版本；
+   * 传空串则安装最新版本，传具体版本号即切换到该历史版本。
+   */
+  async function install_market(extension_id, version = null) {
     const task = await http.post('/api/extensions/market/install', { id: extension_id, version })
     await fetch_market()
     return task
+  }
+
+  /** 获取扩展的全部可选版本（标记兼容当前核心版本与是否已安装） */
+  async function fetch_releases(extension_id) {
+    return await http.get(`/api/extensions/market/${encodeURIComponent(extension_id)}/releases`)
   }
 
   /** 卸载扩展：提交后台任务，进度在任务中心查看 */
@@ -302,6 +312,7 @@ export const useExtensionStore = defineStore('extension', () => {
     save_config_item,
     fetch_market,
     install_market,
+    fetch_releases,
     uninstall_extension,
     reload,
     fetch_image_requirements,

@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Pagination from '@/components/ui/Pagination.vue'
@@ -30,9 +31,25 @@ const props = defineProps({
   busy: { type: String, default: '' },
   /** 是否显示安装 / 升级操作按钮（权限控制） */
   showActions: { type: Boolean, default: true },
+  /** 是否启用多版本切换（扩展市场专用，需后端提供版本清单接口） */
+  versionSwitch: { type: Boolean, default: false },
+  /** 当前打开版本菜单的条目 key */
+  releasesFor: { type: String, default: '' },
+  /** 正在加载版本清单的条目 key */
+  releasesLoading: { type: String, default: '' },
+  /** 当前条目可选版本：[{ version, compatible, installed }]，按版本倒序 */
+  releases: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['update:model-value', 'search', 'page-change', 'install', 'upgrade'])
+const emit = defineEmits([
+  'update:model-value',
+  'search',
+  'page-change',
+  'install',
+  'upgrade',
+  'open-releases',
+  'install-version',
+])
 
 const { t } = useI18n()
 
@@ -43,6 +60,28 @@ const empty_title_text = computed(() => props.emptyTitle || t('extensions.market
 const empty_description_text = computed(
   () => props.emptyDescription || t('extensions.market_empty_description'),
 )
+
+/** 版本切换菜单项（扩展市场专用，按版本倒序） */
+const release_items = computed(() => {
+  if (props.releasesLoading === props.releasesFor) {
+    return [{ label: t('extensions.market_versions_loading'), disabled: true }]
+  }
+  if (props.releases.length === 0) {
+    return [{ label: t('extensions.market_versions_empty'), disabled: true }]
+  }
+  return props.releases.map((release) => ({
+    label: release.compatible
+      ? t('extensions.market_version_name', { version: release.version })
+      : t('extensions.market_version_incompatible_name', { version: release.version }),
+    icon: release.installed
+      ? 'lucide:check'
+      : release.compatible
+        ? 'lucide:tag'
+        : 'lucide:shield-alert',
+    disabled: !release.compatible || release.installed || Boolean(props.busy),
+    on_select: () => install_version(release.version),
+  }))
+})
 
 function item_key(item) {
   return item.module_name || item.id || item.project_link || ''
@@ -58,6 +97,21 @@ function item_desc(item) {
 
 function item_version(item) {
   return item.latest_version || item.version
+}
+
+/** 默认安装目标版本：有兼容历史版本时用 target_version（扩展市场），否则回退最新版本 */
+function target_version(item) {
+  return item.target_version || item_version(item)
+}
+
+/** 是否没有任何兼容当前核心版本的发布（仅扩展市场会带 compatible 字段） */
+function is_unsupported(item) {
+  return item.compatible === false
+}
+
+/** 扩展市场：最新版本不兼容、将安装历史兼容版本 */
+function has_fallback(item) {
+  return Boolean(item.has_compatible_fallback)
 }
 
 /** 项目仓库地址（owner/repo），为空时返回空字符串 */
@@ -84,13 +138,14 @@ function same_version(a, b) {
 /**
  * 是否有可用更新：
  * 插件市场带 registered 字段（无已安装版本数据，沿用原逻辑）；
- * 扩展市场比较已安装版本与最新版本。
+ * 扩展市场比较已安装版本与「默认安装目标版本」（已自动避开不兼容的新版本）。
  */
 function has_update(item) {
   if ('registered' in item) return true
-  const { installed, installed_version, latest_version } = item
-  if (!installed || !installed_version || !latest_version) return false
-  return !same_version(installed_version, latest_version)
+  const { installed, installed_version } = item
+  const target = target_version(item)
+  if (!installed || !installed_version || !target) return false
+  return !same_version(installed_version, target)
 }
 
 /**
@@ -117,6 +172,14 @@ function install(item) {
 
 function upgrade(item) {
   emit('upgrade', item)
+}
+
+function open_releases(item) {
+  emit('open-releases', item)
+}
+
+function install_version(version) {
+  emit('install-version', version)
 }
 </script>
 
@@ -165,6 +228,10 @@ function upgrade(item) {
           <Badge v-else-if="item.registered" variant="warning">
             {{ t('extensions.market_registered_badge') }}
           </Badge>
+          <Badge v-else-if="is_unsupported(item)" variant="danger">
+            <Icon icon="lucide:shield-alert" width="11" />
+            {{ t('extensions.market_unsupported_badge') }}
+          </Badge>
         </div>
 
         <p class="market-desc">{{ item_desc(item) }}</p>
@@ -182,7 +249,17 @@ function upgrade(item) {
 
         <div class="market-foot">
           <div class="market-meta">
-            <span class="mono">v{{ item_version(item) }}</span>
+            <span class="mono" :class="{ 'text-muted': is_unsupported(item) }">
+              v{{ item_version(item) }}
+            </span>
+            <span
+              v-if="has_fallback(item)"
+              class="market-fallback"
+              :title="t('extensions.market_fallback_tooltip')"
+            >
+              <Icon icon="lucide:arrow-right" width="11" />
+              v{{ target_version(item) }}
+            </span>
             <a
               v-if="item.repo"
               :href="repo_url(item)"
@@ -210,9 +287,43 @@ function upgrade(item) {
             >
               <Icon icon="lucide:github" width="15" />
             </a>
+            <template v-if="showActions && versionSwitch">
+              <DropdownMenu
+                align="end"
+                :items="releasesFor === item_key(item) ? release_items : []"
+              >
+                <template #trigger>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon-only
+                    :title="t('extensions.market_version_switch_title')"
+                    :disabled="Boolean(busy) || is_unsupported(item)"
+                    @click="open_releases(item)"
+                  >
+                    <Icon
+                      :icon="
+                        releasesLoading === item_key(item) ? 'lucide:loader' : 'lucide:history'
+                      "
+                      width="14"
+                    />
+                  </Button>
+                </template>
+              </DropdownMenu>
+            </template>
             <template v-if="showActions">
               <Button
-                v-if="can_upgrade(item)"
+                v-if="is_unsupported(item)"
+                variant="secondary"
+                size="sm"
+                disabled
+                :title="t('extensions.market_unsupported_tooltip')"
+              >
+                <Icon icon="lucide:shield-alert" width="13" />
+                {{ t('extensions.market_unsupported_badge') }}
+              </Button>
+              <Button
+                v-else-if="can_upgrade(item)"
                 variant="secondary"
                 size="sm"
                 :loading="busy === item_key(item)"
@@ -393,6 +504,18 @@ function upgrade(item) {
 .market-homepage:hover {
   background: var(--hover);
   color: var(--text);
+}
+
+/* 最新版不兼容、将安装兼容历史版本的提示标记 */
+.market-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .market-author {

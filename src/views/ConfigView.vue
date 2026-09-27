@@ -306,6 +306,7 @@ const RESTART_DEPENDENT_KEYS = ['webui.enabled', 'image.mode']
 // 图片模式依赖扩展（Html2Pic / Default）自动下载引导
 const image_deps_dialog_open = ref(false)
 const image_deps_missing = ref([])
+const image_deps_unsupported = ref([])
 const image_deps_not_in_market = ref([])
 const image_deps_installing = ref(false)
 
@@ -321,7 +322,11 @@ async function prompt_image_deps() {
     const req = await extension_store.fetch_image_requirements()
     const missing_items = (req?.required || []).filter((item) => !item.installed)
     if (missing_items.length === 0) return false
-    image_deps_missing.value = missing_items.filter((item) => item.in_market)
+    // 市场有兼容版本 → 可自动安装；市场有该扩展但无兼容版本 → 提示不支持；否则 → 提示手动安装
+    image_deps_missing.value = missing_items.filter((item) => item.in_market && !item.unsupported)
+    image_deps_unsupported.value = missing_items.filter(
+      (item) => item.in_market && item.unsupported,
+    )
     image_deps_not_in_market.value = missing_items.filter((item) => !item.in_market)
     image_deps_dialog_open.value = true
     return true
@@ -889,6 +894,19 @@ async function confirm_messages_save() {
           <Icon icon="lucide:download" width="15" class="text-muted" />
           <span>{{ item.name }}</span>
           <span class="mono text-muted">{{ item.id }}</span>
+        </div>
+        <div v-if="image_deps_unsupported.length > 0" class="image-dep-warning">
+          <Icon icon="lucide:shield-alert" width="15" />
+          <span>
+            {{ t('config_view.image_deps_unsupported_warning') }}
+            <span
+              v-for="item in image_deps_unsupported"
+              :key="item.id"
+              class="mono image-dep-inline"
+            >
+              {{ t('config_view.image_deps_item_with_id', { name: item.name, id: item.id }) }}
+            </span>
+          </span>
         </div>
         <div v-if="image_deps_not_in_market.length > 0" class="image-dep-warning">
           <Icon icon="lucide:triangle-alert" width="15" />

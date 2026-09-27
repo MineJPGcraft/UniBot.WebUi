@@ -66,6 +66,11 @@ const market_keyword = ref('')
 const market_filter = ref('')
 /** 市场安装 / 升级操作中的扩展 id */
 const market_action = ref('')
+/** 版本清单菜单已打开的扩展 id / 正在加载的扩展 id */
+const releases_for = ref('')
+const releases_loading = ref('')
+/** 当前扩展的可选版本（按版本倒序） */
+const release_options = ref([])
 /** Extension Studio 日志弹窗开关 */
 const studio_log_open = ref(false)
 /** 创意工坊首次下载说明弹窗开关 */
@@ -190,17 +195,54 @@ const filtered_market_items = computed(() => {
 })
 
 async function install_market_extension(item) {
+  // 默认安装目标版本：兼容当前核心版本的历史版本（无兼容版本时后端会拒绝）
+  await run_market_install(item, null)
+}
+
+/** 打开某扩展的版本清单下拉（再次点击关闭）；切换时清空上一次的版本列表 */
+async function open_releases(item) {
+  const extension_id = item.id
+  if (releases_for.value === extension_id) {
+    releases_for.value = ''
+    return
+  }
+  releases_for.value = extension_id
+  release_options.value = []
+  releases_loading.value = extension_id
+  try {
+    const data = await extension_store.fetch_releases(extension_id)
+    release_options.value = data?.releases || []
+  } catch (error) {
+    toast.error(error.message || t('extensions.market_versions_fetch_failed'))
+  } finally {
+    releases_loading.value = ''
+  }
+}
+
+/** 切换到指定历史版本（显式指定版本时后端允许安装不兼容当前核心的版本） */
+async function install_extension_version(version) {
+  const item = market_items.value.find((row) => row.id === releases_for.value)
+  if (!item) return
+  await run_market_install(item, version)
+}
+
+/** 提交安装任务（version 为 null 表示自动选择兼容版本），等待任务完成后刷新市场 */
+async function run_market_install(item, version) {
   market_action.value = item.id
+  releases_for.value = ''
   // 后端在任务中心串行完成下载 → 依赖同步 → 热重载，此处等任务结束并刷新列表
   const task = await submit_task(
-    () => extension_store.install_market(item.id),
+    () => extension_store.install_market(item.id, version),
     t('extensions.installed_install_failed'),
   )
   market_action.value = ''
-  if (task) {
-    await search_market()
-    toast.success(t('extensions.installed_install_success', { name: item.name }))
-  }
+  if (!task) return
+  await search_market()
+  toast.success(
+    version
+      ? t('extensions.installed_version_switch_success', { name: item.name, version })
+      : t('extensions.installed_install_success', { name: item.name }),
+  )
 }
 
 async function uninstall_extension(extension) {
@@ -517,10 +559,16 @@ async function open_studio_log() {
           item-icon="lucide:package"
           :busy="market_action"
           :show-actions="auth_store.is_admin"
+          :version-switch="true"
+          :releases-for="releases_for"
+          :releases-loading="releases_loading"
+          :releases="release_options"
           @update:model-value="(value) => (market_keyword = value)"
           @search="search_market"
           @install="install_market_extension"
           @upgrade="install_market_extension"
+          @open-releases="open_releases"
+          @install-version="install_extension_version"
         />
       </template>
 
