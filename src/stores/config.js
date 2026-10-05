@@ -8,6 +8,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { http } from '@/utils/http'
 import { get_nested, set_nested } from '@/utils/format'
+import { each_message_item, message_value as message_value_of } from '@/utils/message_tree'
 
 export const useConfigStore = defineStore('config', () => {
   const config_data = ref(null)
@@ -33,12 +34,14 @@ export const useConfigStore = defineStore('config', () => {
   const raw_loading = ref(false)
   const raw_saving = ref(false)
 
-  // 消息文本（Messages.toml 源码）
-  const messages_toml = ref('')
-  const messages_original = ref('')
+  // 消息文本覆盖层（按键命名空间的树 + 逐键草稿）
+  const messages_language = ref('zh')
+  const messages_tree = ref([])
+  const messages_total_count = ref(0)
+  const messages_modified_count = ref(0)
+  const messages_draft = ref({})
   const messages_loading = ref(false)
   const messages_saving = ref(false)
-
   /** 草稿相对原配置的变更项：[{ key, label, old_value, new_value }] */
   const changes = computed(() => {
     if (!config_data.value || !draft.value || !schema.value) return []
@@ -78,8 +81,25 @@ export const useConfigStore = defineStore('config', () => {
       raw_config.value !== raw_config_original.value || raw_env.value !== raw_env_original.value,
   )
 
-  /** 消息文本是否有未保存的改动 */
-  const has_messages_changes = computed(() => messages_toml.value !== messages_original.value)
+  /** 未保存的消息改动项：[{ key, value }]（草稿值相对服务端生效值） */
+  const messages_changes = computed(() => {
+    const result = []
+    each_message_item(messages_tree.value, (item) => {
+      if (!(item.key in messages_draft.value)) return
+      const draft = messages_draft.value[item.key]
+      if (JSON.stringify(draft) !== JSON.stringify(item.value)) {
+        result.push({ key: item.key, value: draft })
+      }
+    })
+    return result
+  })
+
+  const has_messages_changes = computed(() => messages_changes.value.length > 0)
+
+  /** 某条消息的生效值：草稿优先，否则用服务端下发的生效值 */
+  function message_value(item) {
+    return message_value_of(item, messages_draft.value)
+  }
 
   async function fetch_all() {
     loading.value = true
@@ -199,26 +219,48 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  /** 获取 Messages.toml 原始文本内容 */
-  async function fetch_messages() {
+  /** 获取消息文本分组树（前端界面语言下，中文为默认可改语言，英文可逐条改） */
+  async function fetch_messages(language = 'zh') {
     messages_loading.value = true
     try {
-      const data = await http.get('/api/config/messages')
-      messages_toml.value = data.messages_toml || ''
-      messages_original.value = messages_toml.value
+      const data = await http.get(`/api/config/messages?language=${encodeURIComponent(language)}`)
+      messages_language.value = data.language || language
+      messages_tree.value = data.tree || []
+      messages_total_count.value = data.total_count || 0
+      messages_modified_count.value = data.modified_count || 0
+      messages_draft.value = {}
     } finally {
       messages_loading.value = false
     }
   }
 
-  /** 保存消息文本改动 */
+  /** 更新某条消息的草稿值 */
+  function update_message(key, value) {
+    messages_draft.value = { ...messages_draft.value, [key]: value }
+  }
+
+  /** 清空消息草稿 */
+  function reset_messages_draft() {
+    messages_draft.value = {}
+  }
+
+  /** 保存消息改动到覆盖层（提交全部覆盖键，未改动项由后端剔除） */
   async function save_messages() {
-    if (!has_messages_changes.value) return false
+    const overrides = {}
+    each_message_item(messages_tree.value, (item) => {
+      const current = message_value(item)
+      if (JSON.stringify(current) !== JSON.stringify(item.base_value)) {
+        overrides[item.key] = current
+      }
+    })
     messages_saving.value = true
     try {
-      await http.patch('/api/config/messages', { messages_toml: messages_toml.value })
-      messages_original.value = messages_toml.value
-      return true
+      const data = await http.patch('/api/config/messages', {
+        language: messages_language.value,
+        overrides,
+      })
+      await fetch_messages(messages_language.value)
+      return data.modified_count ?? 0
     } finally {
       messages_saving.value = false
     }
@@ -262,12 +304,19 @@ export const useConfigStore = defineStore('config', () => {
     fetch_raw,
     save_raw,
     // 消息文本
-    messages_toml,
-    messages_original,
+    messages_language,
+    messages_tree,
+    messages_total_count,
+    messages_modified_count,
+    messages_draft,
     messages_loading,
     messages_saving,
+    messages_changes,
     has_messages_changes,
+    message_value,
     fetch_messages,
+    update_message,
+    reset_messages_draft,
     save_messages,
   }
 })

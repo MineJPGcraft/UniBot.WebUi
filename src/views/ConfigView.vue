@@ -15,8 +15,11 @@ import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
+import Select from '@/components/ui/Select.vue'
 import SchemaForm from '@/components/ui/SchemaForm.vue'
 import DiffPreviewDialog from '@/components/config/DiffPreviewDialog.vue'
+import MessageTree from '@/components/config/MessageTree.vue'
+import { LOCALES } from '@/i18n'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -45,8 +48,9 @@ const {
   raw_env_original,
   raw_loading,
   raw_saving,
-  messages_toml,
-  messages_original,
+  messages_language,
+  messages_tree,
+  messages_draft,
   messages_loading,
   messages_saving,
   has_messages_changes,
@@ -429,14 +433,6 @@ const current_raw_changed = computed(() =>
     : raw_config.value !== raw_config_original.value,
 )
 
-/** 消息文本行数（空文本按 0 计） */
-const messages_line_count = computed(() =>
-  messages_toml.value ? messages_toml.value.split('\n').length : 0,
-)
-
-/** 消息文本字符数（不含换行） */
-const messages_char_count = computed(() => messages_toml.value.replace(/\n/g, '').length)
-
 async function open_raw_editor(target) {
   raw_editor_target.value = target
   raw_editor_open.value = true
@@ -453,27 +449,40 @@ async function open_raw_editor(target) {
 
 const messages_loaded = ref(false)
 
-/** 进入消息 tab 时按需加载 Messages.toml */
+/** 进入消息 tab 时按需加载分组树（中文为可改语言） */
 async function ensure_messages() {
   if (messages_loaded.value) return
   messages_loaded.value = true
   try {
-    await config_store.fetch_messages()
+    await config_store.fetch_messages(messages_language.value)
   } catch (error) {
     messages_loaded.value = false
     toast.error(error.message || t('config_view.toast_load_messages_failed'))
   }
 }
 
+function handle_message_update(key, value) {
+  config_store.update_message(key, value)
+}
+
 function reset_messages() {
-  messages_toml.value = messages_original.value
+  config_store.reset_messages_draft()
+}
+
+/** 切换要编辑的消息语言（丢弃当前草稿并重新拉取分组树） */
+async function change_messages_language(language) {
+  try {
+    await config_store.fetch_messages(language)
+  } catch (error) {
+    toast.error(error.message || t('config_view.toast_load_messages_failed'))
+  }
 }
 
 async function confirm_messages_save() {
   try {
-    const saved = await config_store.save_messages()
+    const count = await config_store.save_messages()
     toast.success(
-      saved ? t('config_view.toast_messages_saved') : t('config_view.no_changes_detected'),
+      count > 0 ? t('config_view.toast_messages_saved') : t('config_view.no_changes_detected'),
     )
   } catch (error) {
     toast.error(error.message || t('config_view.save_failed'))
@@ -613,12 +622,26 @@ async function confirm_messages_save() {
       <!-- 消息文本 -->
       <template #messages>
         <div class="tab-actions">
+          <span class="text-xs text-muted tab-action-left">
+            {{ t('config_view.tab_messages_sub_prefix') }}
+            <code class="mono message-code">{{
+              t('config_view.tab_messages_placeholder_example')
+            }}</code>
+            {{ t('config_view.tab_messages_sub_suffix') }}
+          </span>
+          <Select
+            class="message-language-select"
+            :model-value="messages_language"
+            :options="LOCALES"
+            @update:model-value="change_messages_language"
+          />
           <Button variant="ghost" :disabled="!has_messages_changes" @click="reset_messages">
             {{ t('config_view.revert_changes') }}
           </Button>
           <Button
             variant="primary"
             :disabled="!has_messages_changes"
+            :loading="messages_saving"
             @click="confirm_messages_save"
           >
             <Icon icon="lucide:save" width="15" />
@@ -632,63 +655,12 @@ async function confirm_messages_save() {
           </div>
         </div>
 
-        <section v-else class="card message-editor">
-          <div class="card-header message-editor-header">
-            <div class="message-editor-heading">
-              <div class="message-editor-title">
-                <span class="message-editor-badge">
-                  <Icon icon="lucide:message-square-text" width="16" />
-                </span>
-                <div>
-                  <h3 class="card-title">Messages.toml</h3>
-                  <p class="message-editor-sub">
-                    {{ t('config_view.tab_messages_sub_prefix') }}
-                    <code class="mono message-code">{{
-                      t('config_view.tab_messages_placeholder_example')
-                    }}</code>
-                    {{ t('config_view.tab_messages_sub_suffix') }}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <span v-if="!messages_loading" class="message-editor-meta">
-              {{
-                t('config_view.tab_messages_stats', {
-                  line_count: messages_line_count,
-                  char_count: messages_char_count,
-                })
-              }}
-            </span>
-          </div>
-          <div class="message-editor-body">
-            <div v-if="messages_toml === ''" class="raw-loading">
-              <Spinner />
-              <span>{{ t('config_view.tab_messages_loading_body') }}</span>
-            </div>
-            <CodeEditor
-              v-else
-              v-model="messages_toml"
-              language="toml"
-              class="raw-code-editor raw-code-editor--messages"
-            />
-          </div>
-          <div class="message-editor-footer">
-            <div class="message-editor-hint">
-              <Icon icon="lucide:info" width="13" />
-              {{ t('config_view.tab_messages_hint_prefix') }}
-              <code class="mono message-code">{name}</code>
-              {{ t('config_view.tab_messages_hint_suffix') }}
-            </div>
-            <span v-if="has_messages_changes" class="raw-changed">
-              <Icon icon="lucide:circle-alert" width="13" />
-              {{ t('config_view.changed_tip') }}
-            </span>
-            <span v-else class="raw-saved-tip">
-              <Icon icon="lucide:check-circle" width="13" />
-              {{ t('config_view.unchanged_tip') }}
-            </span>
-          </div>
-        </section>
+        <MessageTree
+          v-else
+          :tree="messages_tree"
+          :draft="messages_draft"
+          @update="handle_message_update"
+        />
       </template>
 
       <!-- 扩展配置 -->
@@ -1169,111 +1141,15 @@ async function confirm_messages_save() {
 }
 
 /* 消息文本编辑器 */
-.message-editor {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.message-editor-header {
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.message-editor-heading {
-  display: flex;
-  align-items: center;
-}
-
-.message-editor-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.message-editor-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-  flex-shrink: 0;
-}
-
-.message-editor-sub {
-  margin-top: 2px;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.message-editor-meta {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  white-space: nowrap;
-}
-
-.message-editor-body {
-  padding: var(--space-4) var(--space-5) 0;
-}
-
-.message-editor-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-3) var(--space-5) var(--space-4);
-}
-
-.message-editor-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.raw-code-editor--messages {
-  height: 460px;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
 .message-code {
   padding: 1px 5px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--text) 8%, transparent);
   font-weight: 600;
 }
 
-@media (max-width: 700px) {
-  .message-editor-meta {
-    display: none;
-  }
-
-  .message-editor-footer {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
-  .message-editor-footer .raw-changed,
-  .message-editor-footer .raw-saved-tip {
-    justify-content: flex-start;
-  }
-
-  .raw-code-editor--messages {
-    height: 380px;
-  }
+.message-language-select {
+  width: 120px;
 }
 
 .raw-actions {
