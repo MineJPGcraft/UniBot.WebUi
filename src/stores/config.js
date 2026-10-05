@@ -8,7 +8,11 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { http } from '@/utils/http'
 import { get_nested, set_nested } from '@/utils/format'
-import { each_message_item, message_value as message_value_of } from '@/utils/message_tree'
+import {
+  each_message_item,
+  message_pending,
+  message_value as message_value_of,
+} from '@/utils/message_tree'
 
 export const useConfigStore = defineStore('config', () => {
   const config_data = ref(null)
@@ -85,11 +89,8 @@ export const useConfigStore = defineStore('config', () => {
   const messages_changes = computed(() => {
     const result = []
     each_message_item(messages_tree.value, (item) => {
-      if (!(item.key in messages_draft.value)) return
-      const draft = messages_draft.value[item.key]
-      if (JSON.stringify(draft) !== JSON.stringify(item.value)) {
-        result.push({ key: item.key, value: draft })
-      }
+      if (!message_pending(item, messages_draft.value)) return
+      result.push({ key: item.key, value: messages_draft.value[item.key] })
     })
     return result
   })
@@ -219,8 +220,8 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  /** 获取消息文本分组树（前端界面语言下，中文为默认可改语言，英文可逐条改） */
-  async function fetch_messages(language = 'zh') {
+  /** 获取消息文本分组树（language 由调用方指定，面板内跟随界面语言） */
+  async function fetch_messages(language) {
     messages_loading.value = true
     try {
       const data = await http.get(`/api/config/messages?language=${encodeURIComponent(language)}`)

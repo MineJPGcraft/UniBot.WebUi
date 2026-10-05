@@ -1,7 +1,8 @@
 <script setup>
 /**
- * 消息树叶片行：显示「键名 + 已修改标记 + 恢复默认」与对应的值编辑器。
+ * 消息树叶片行：显示「键名 + 状态标标 + 恢复默认」与对应的值编辑器。
  *
+ * 状态标标分两种：未保存改动（橙色「已修改」）/ 已保存的覆盖（蓝色「已覆盖」）；
  * 值编辑器按类型分流：字符串用 MessageValueEditor（占位符可拖拽），
  * 字符串列表用行内列表编辑；草稿值由父级统一管理。
  */
@@ -10,7 +11,7 @@ import { Icon } from '@iconify/vue'
 import { use_list_keys } from '@/composables/use_list_keys'
 import MessageValueEditor from '@/components/config/MessageValueEditor.vue'
 import Input from '@/components/ui/Input.vue'
-import { message_modified, message_value } from '@/utils/message_tree'
+import { message_modified, message_pending, message_value } from '@/utils/message_tree'
 
 const props = defineProps({
   /** 叶子消息项：{ key, value, base_value, is_list, placeholders } */
@@ -31,6 +32,11 @@ function current() {
 
 function is_modified() {
   return message_modified(props.item, props.draft)
+}
+
+/** 是否有未保存的草稿改动（相对服务端生效值） */
+function is_pending() {
+  return message_pending(props.item, props.draft)
 }
 
 function update(value) {
@@ -57,8 +63,11 @@ function update_list_item(index, value) {
   <div class="message-row">
     <div class="message-row-head">
       <code class="message-key">{{ item.key }}</code>
-      <span v-if="is_modified()" class="message-badge">
+      <span v-if="is_pending()" class="message-badge">
         {{ t('config_view.messages_modified') }}
+      </span>
+      <span v-else-if="is_modified()" class="message-badge message-badge--saved">
+        {{ t('config_view.messages_override') }}
       </span>
       <button
         v-if="is_modified()"
@@ -128,6 +137,12 @@ function update_list_item(index, value) {
   color: var(--warning);
   font-size: var(--text-xs);
   font-weight: 500;
+}
+
+/* 已保存的覆盖：安静的蓝色标标，与未保存的橙色「已修改」区分 */
+.message-badge--saved {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .message-reset {

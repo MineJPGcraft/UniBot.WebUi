@@ -4,6 +4,7 @@
  *
  * - 按翻译键的点路径（如 `core.commands.luck.result`）折叠为可展开/折叠的命名空间树；
  * - 顶部提供搜索（按命名空间路径 / 键名 / 消息内容过滤，命中时自动展开）与全部展开/折叠；
+ * - 未保存改动数按树统计（`pending_edit_counts`），驱动命名空间节点上的提示点；
  * - 叶子消息由 MessageTreeRow 渲染，草稿值经 `update` 事件冒泡给父级 store。
  */
 import { computed, ref, watch } from 'vue'
@@ -13,7 +14,12 @@ import MessageTreeNode from '@/components/config/MessageTreeNode.vue'
 import Input from '@/components/ui/Input.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { use_message_editor } from '@/composables/use_message_editor'
-import { each_message_item, message_value, namespace_paths } from '@/utils/message_tree'
+import {
+  each_message_item,
+  message_value,
+  namespace_paths,
+  pending_edit_counts,
+} from '@/utils/message_tree'
 
 const props = defineProps({
   /** 命名空间树：[{ name, path, label, count, modified_count, children, items }] */
@@ -76,6 +82,9 @@ const visible_count = computed(() => {
   })
   return count
 })
+
+/** 各命名空间子树内的未保存改动数（`{ path: count }`），驱动节点上的提示点 */
+const pending_counts = computed(() => pending_edit_counts(props.tree, props.draft))
 
 // 展开状态：`{ 命名空间路径: true }` 映射；默认展开顶层命名空间。
 const expanded = ref({})
@@ -150,6 +159,7 @@ function on_update(key, value) {
         :key="node.path"
         :node="node"
         :draft="draft"
+        :pending-counts="pending_counts"
         :depth="0"
         :expanded="expanded"
         :query="query.trim()"

@@ -2,7 +2,7 @@
 /**
  * 消息**命名空间树**的单个节点（递归组件）。
  *
- * - 节点头部可点击展开/折叠，显示命名空间名、完整路径、子树消息数与「已修改」指示点；
+ * - 节点头部可点击展开/折叠，显示命名空间名、完整路径、子树消息数与**未保存改动**指示点；
  * - 展开后先渲染本层叶子消息（MessageTreeRow），再递归渲染子命名空间；
  * - 搜索时（`query` 非空）所有节点自动展开，方便查看命中项。
  */
@@ -14,6 +14,8 @@ const props = defineProps({
   node: { type: Object, required: true },
   /** 草稿：键 → 草稿值 */
   draft: { type: Object, default: () => ({}) },
+  /** 各命名空间子树内的未保存改动数：`{ path: count }` */
+  pendingCounts: { type: Object, default: () => ({}) },
   /** 树的当前层数（根为 0，用于缩进） */
   depth: { type: Number, default: 0 },
   /** 已展开的命名空间路径映射 `{ path: true }` */
@@ -48,7 +50,7 @@ function on_update(key, value) {
       />
       <span class="node-label">{{ node.label }}</span>
       <code class="node-path">{{ node.path }}</code>
-      <span v-if="node.modified_count" class="node-dot" />
+      <span v-if="pendingCounts[node.path]" class="node-dot" />
       <span class="node-count">{{ node.count }}</span>
     </button>
 
@@ -68,6 +70,7 @@ function on_update(key, value) {
         :key="child.path"
         :node="child"
         :draft="draft"
+        :pending-counts="pendingCounts"
         :depth="depth + 1"
         :expanded="expanded"
         :query="query"

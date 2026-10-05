@@ -15,11 +15,10 @@ import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import CodeEditor from '@/components/ui/CodeEditor.vue'
-import Select from '@/components/ui/Select.vue'
 import SchemaForm from '@/components/ui/SchemaForm.vue'
 import DiffPreviewDialog from '@/components/config/DiffPreviewDialog.vue'
 import MessageTree from '@/components/config/MessageTree.vue'
-import { LOCALES } from '@/i18n'
+import { current_locale } from '@/i18n'
 import { get_nested } from '@/utils/format'
 
 const config_store = useConfigStore()
@@ -247,6 +246,13 @@ watch(active_tab, (val) => {
   if (val === 'messages') ensure_messages()
   if (val === 'extensions') ensure_extensions()
 })
+// 消息语言跟随面板界面语言：消息 tab 内切换界面语言时重拉消息树
+watch(
+  () => current_locale(),
+  () => {
+    if (active_tab.value === 'messages') ensure_messages()
+  },
+)
 watch(active_env_group, (val) => {
   if (active_tab.value === 'env') sync_query({ group: val })
 })
@@ -449,12 +455,13 @@ async function open_raw_editor(target) {
 
 const messages_loaded = ref(false)
 
-/** 进入消息 tab 时按需加载分组树（中文为可改语言） */
+/** 进入消息 tab 时按需加载分组树（消息语言跟随面板界面语言，语言变化时重拉） */
 async function ensure_messages() {
-  if (messages_loaded.value) return
+  const language = current_locale()
+  if (messages_loaded.value && messages_language.value === language) return
   messages_loaded.value = true
   try {
-    await config_store.fetch_messages(messages_language.value)
+    await config_store.fetch_messages(language)
   } catch (error) {
     messages_loaded.value = false
     toast.error(error.message || t('config_view.toast_load_messages_failed'))
@@ -467,15 +474,6 @@ function handle_message_update(key, value) {
 
 function reset_messages() {
   config_store.reset_messages_draft()
-}
-
-/** 切换要编辑的消息语言（丢弃当前草稿并重新拉取分组树） */
-async function change_messages_language(language) {
-  try {
-    await config_store.fetch_messages(language)
-  } catch (error) {
-    toast.error(error.message || t('config_view.toast_load_messages_failed'))
-  }
 }
 
 async function confirm_messages_save() {
@@ -629,12 +627,6 @@ async function confirm_messages_save() {
             }}</code>
             {{ t('config_view.tab_messages_sub_suffix') }}
           </span>
-          <Select
-            class="message-language-select"
-            :model-value="messages_language"
-            :options="LOCALES"
-            @update:model-value="change_messages_language"
-          />
           <Button variant="ghost" :disabled="!has_messages_changes" @click="reset_messages">
             {{ t('config_view.revert_changes') }}
           </Button>
@@ -1146,10 +1138,6 @@ async function confirm_messages_save() {
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--text) 8%, transparent);
   font-weight: 600;
-}
-
-.message-language-select {
-  width: 120px;
 }
 
 .raw-actions {
