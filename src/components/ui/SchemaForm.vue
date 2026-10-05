@@ -8,6 +8,9 @@
  *
  * `values` 为当前值快照，草稿由内部维护：仅在 schema 或 values 首次就绪时重建，
  * 避免父组件刷新 values 时覆盖用户未保存的编辑。
+ *
+ * schema 变化（如切换界面语言后后端重下发的标题 / 描述）默认会重建草稿；
+ * 传入 `keepDraftOnSchemaChange` 时仅更新字段文案，保留用户未保存的编辑。
  */
 import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -41,6 +44,11 @@ const props = defineProps({
   showActions: { type: Boolean, default: true },
   /** 高亮这些字段（如门控锁定） */
   lockedKeys: { type: Array, default: () => [] },
+  /**
+   * schema 变化时保留草稿（仅更新标题 / 描述等文案）。
+   * 用于语言切换后重拉 schema 的场景，避免丢失未保存的编辑。
+   */
+  keepDraftOnSchemaChange: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['save', 'change', 'update'])
@@ -78,6 +86,11 @@ watch(
   () => props.schema,
   () => {
     if (!props.schema) return
+    if (props.keepDraftOnSchemaChange) {
+      // 仅更新字段文案（标题 / 描述），保留未保存草稿
+      initialize_draft()
+      return
+    }
     reset_draft()
   },
   { immediate: true },

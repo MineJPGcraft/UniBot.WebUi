@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
@@ -61,6 +61,18 @@ const toggling = ref('')
 const reloading = ref(false)
 const config_open = ref(false)
 const active_extension = ref(null)
+/** 当前配置弹窗所示扩展 id：列表刷新（如语言切换）后据此同步名称 / 描述 */
+const active_extension_id = ref('')
+
+// 语言切换后 installed_list 会重新下发（名称 / 描述按新语言），同步弹窗内的展示信息
+watch(
+  () => installed_list.value,
+  (list) => {
+    if (!active_extension_id.value) return
+    const matched = list.find((item) => item.id === active_extension_id.value)
+    if (matched) active_extension.value = matched
+  },
+)
 const market_keyword = ref('')
 /** 已应用的市场搜索关键词（点击搜索后生效） */
 const market_filter = ref('')
@@ -286,6 +298,7 @@ async function toggle_extension(extension, enabled) {
 }
 
 async function open_config(extension) {
+  active_extension_id.value = extension.id
   active_extension.value = extension
   config_open.value = true
   try {
@@ -300,8 +313,8 @@ async function open_config(extension) {
 
 async function save_extension_config(values) {
   try {
-    await extension_store.save_config(active_extension.value.id, values)
-    toast.success(t('extensions.config_save_success', { name: active_extension.value.name }))
+    await extension_store.save_config(active_extension_id.value, values)
+    toast.success(t('extensions.config_save_success', { name: active_extension.value?.name }))
     config_open.value = false
   } catch (error) {
     toast.error(error.message || t('extensions.config_save_failed'))
@@ -667,6 +680,7 @@ async function open_studio_log() {
                 :values="item.values"
                 :saving="saving_render_config === item.id"
                 :disabled="!item.available"
+                :keep-draft-on-schema-change="true"
                 @save="(values) => save_render_plugin_config(item, values)"
               />
             </div>

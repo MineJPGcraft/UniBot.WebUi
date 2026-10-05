@@ -547,6 +547,7 @@ async function confirm_messages_save() {
                 :values="config_data"
                 :nested="true"
                 :show-actions="false"
+                :keep-draft-on-schema-change="true"
                 :locked-keys="active_group_locked ? [active_group_data.gated_by] : []"
                 @update="({ key, value }) => handle_config_update(key, value)"
               />
@@ -610,6 +611,7 @@ async function confirm_messages_save() {
                 :fields="active_env_group_data.keys"
                 :values="env_values"
                 :show-actions="false"
+                :keep-draft-on-schema-change="true"
                 @update="({ key, value }) => handle_env_update(key, value)"
               />
             </div>
@@ -749,6 +751,7 @@ async function confirm_messages_save() {
                 :values="active_extension_item.values"
                 :saving="saving_config_item === active_extension_item.id"
                 :show-actions="false"
+                :keep-draft-on-schema-change="true"
                 @change="(count) => (extension_config_changes = count)"
                 @save="(values) => save_extension_item(active_extension_item, values)"
               />

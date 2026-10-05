@@ -14,14 +14,15 @@ export const useAdapterStore = defineStore('adapter', () => {
   const catalog = ref([])
   const loading = ref(false)
 
-  async function fetch_all() {
-    loading.value = true
+  /** 获取适配器注册列表与目录；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_all({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
       const data = await http.get('/api/config/nonebot')
       registered_list.value = data.adapters || []
       catalog.value = data.adapter_catalog || []
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 

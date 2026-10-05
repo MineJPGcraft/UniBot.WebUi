@@ -10,11 +10,15 @@ import UpdatePrompt from './UpdatePrompt.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useStatusStore } from '@/stores/status'
 import { use_websocket } from '@/composables/use_websocket'
+import { use_locale_refresh } from '@/composables/use_locale_refresh'
 
 const auth_store = useAuthStore()
 const status_store = useStatusStore()
 const { status } = storeToRefs(status_store)
 const { connect, disconnect } = use_websocket()
+
+// 界面语言切换后重拉已加载的语言相关数据（配置 schema / 适配器 / 扩展 / 插件等）
+use_locale_refresh()
 
 onMounted(() => {
   auth_store.fetch_me().catch((error) => console.warn('fetch_me failed', error))

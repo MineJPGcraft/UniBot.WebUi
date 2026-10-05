@@ -57,6 +57,7 @@ function open_in_config_page() {
       :values="values"
       :loading="loading"
       :saving="saving"
+      :keep-draft-on-schema-change="true"
       @save="(payload) => emit('save', payload)"
     >
       <template #actions-left>

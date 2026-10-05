@@ -19,12 +19,13 @@ export const usePluginStore = defineStore('plugin', () => {
   const loading = ref(false)
   const market_loading = ref(false)
 
-  async function fetch_installed() {
-    loading.value = true
+  /** 获取已安装插件列表；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_installed({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
       installed_list.value = (await http.get('/api/plugins')) || []
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 

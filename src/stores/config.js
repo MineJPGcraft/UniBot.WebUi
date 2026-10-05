@@ -102,8 +102,9 @@ export const useConfigStore = defineStore('config', () => {
     return message_value_of(item, messages_draft.value)
   }
 
-  async function fetch_all() {
-    loading.value = true
+  /** 获取 Config.toml 的值与 Schema；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_all({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
       const [data, schema_data] = await Promise.all([
         http.get('/api/config'),
@@ -114,20 +115,39 @@ export const useConfigStore = defineStore('config', () => {
       groups.value = schema_data.groups || []
       draft.value = JSON.parse(JSON.stringify(data))
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 
-  async function fetch_env() {
-    env_loading.value = true
+  /**
+   * 仅重拉 Config.toml 的 Schema 与分组名（字段标题 / 描述由后端按界面语言下发），
+   * 保留 config_data / 用户草稿不变，供语言切换时实时更新表单文案。
+   */
+  async function fetch_schema() {
+    const schema_data = await http.get('/api/config/schema')
+    schema.value = schema_data.schema || null
+    groups.value = schema_data.groups || []
+  }
+
+  /**
+   * 获取 .env 的值与 Schema。
+   *
+   * `silent` 用于语言切换等后台刷新（不触发 loading）；
+   * `preserve_draft` 保留未保存的草稿（语言切换场景：重新下发的值与原值一致，
+   * 覆盖草稿会丢失用户编辑）。
+   */
+  async function fetch_env({ silent = false, preserve_draft = false } = {}) {
+    if (!silent) env_loading.value = true
     try {
       const data = await http.get('/api/config/env')
       env_values.value = data.values || {}
       env_schema.value = data.schema || null
       env_groups.value = data.groups || []
-      env_draft.value = JSON.parse(JSON.stringify(data.values || {}))
+      if (!preserve_draft) {
+        env_draft.value = JSON.parse(JSON.stringify(data.values || {}))
+      }
     } finally {
-      env_loading.value = false
+      if (!silent) env_loading.value = false
     }
   }
 
@@ -277,6 +297,7 @@ export const useConfigStore = defineStore('config', () => {
     changes,
     has_changes,
     fetch_all,
+    fetch_schema,
     update_field,
     reset_draft,
     save_changes,

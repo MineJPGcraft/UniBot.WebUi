@@ -50,31 +50,34 @@ export const useExtensionStore = defineStore('extension', () => {
   const studio_log = ref('')
   const studio_log_loading = ref(false)
 
-  async function fetch_installed() {
-    loading.value = true
+  /** 获取已安装扩展列表；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_installed({ silent = false } = {}) {
+    if (!silent) loading.value = true
     try {
       installed_list.value = (await http.get('/api/extensions')) || []
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 
-  async function fetch_detail(extension_id) {
-    detail_loading.value = true
+  /** 获取扩展详情；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_detail(extension_id, { silent = false } = {}) {
+    if (!silent) detail_loading.value = true
     try {
       detail.value = await http.get(`/api/extensions/items/${encodeURIComponent(extension_id)}`)
     } finally {
-      detail_loading.value = false
+      if (!silent) detail_loading.value = false
     }
   }
 
-  async function fetch_config(extension_id) {
-    config_loading.value = true
+  /** 获取扩展配置；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_config(extension_id, { silent = false } = {}) {
+    if (!silent) config_loading.value = true
     try {
       config_values.value =
         (await http.get(`/api/extensions/${encodeURIComponent(extension_id)}/config`)) || {}
     } finally {
-      config_loading.value = false
+      if (!silent) config_loading.value = false
     }
   }
 
@@ -96,12 +99,13 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
-  async function fetch_renderers() {
-    renderer_loading.value = true
+  /** 获取渲染引擎列表；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_renderers({ silent = false } = {}) {
+    if (!silent) renderer_loading.value = true
     try {
       renderers.value = (await http.get('/api/extensions/renderers')) || []
     } finally {
-      renderer_loading.value = false
+      if (!silent) renderer_loading.value = false
     }
   }
 
@@ -110,12 +114,13 @@ export const useExtensionStore = defineStore('extension', () => {
     await fetch_renderers()
   }
 
-  async function fetch_templates() {
-    template_loading.value = true
+  /** 获取模板列表；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_templates({ silent = false } = {}) {
+    if (!silent) template_loading.value = true
     try {
       templates.value = (await http.get('/api/extensions/templates')) || []
     } finally {
-      template_loading.value = false
+      if (!silent) template_loading.value = false
     }
   }
 
@@ -124,12 +129,13 @@ export const useExtensionStore = defineStore('extension', () => {
     await fetch_templates()
   }
 
-  async function fetch_render_configs() {
-    render_config_loading.value = true
+  /** 获取渲染插件配置列表；`silent` 用于语言切换等后台刷新（不触发 loading） */
+  async function fetch_render_configs({ silent = false } = {}) {
+    if (!silent) render_config_loading.value = true
     try {
       render_configs.value = (await http.get('/api/extensions/render-configs')) || []
     } finally {
-      render_config_loading.value = false
+      if (!silent) render_config_loading.value = false
     }
   }
 
@@ -143,13 +149,13 @@ export const useExtensionStore = defineStore('extension', () => {
     }
   }
 
-  /** 获取全部带配置项的扩展（代码扩展 + 无代码模板包） */
-  async function fetch_config_items() {
-    config_items_loading.value = true
+  /** 获取全部带配置项的扩展（代码扩展 + 无代码模板包）；`silent` 用于语言切换等后台刷新 */
+  async function fetch_config_items({ silent = false } = {}) {
+    if (!silent) config_items_loading.value = true
     try {
       config_items.value = (await http.get('/api/extensions/config-items')) || []
     } finally {
-      config_items_loading.value = false
+      if (!silent) config_items_loading.value = false
     }
   }
 
