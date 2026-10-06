@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
 import { useAdapterStore } from '@/stores/adapter'
 import { useStatusStore } from '@/stores/status'
+import { useAuthStore } from '@/stores/auth'
 import { use_toast } from '@/composables/use_toast'
 import Badge from '@/components/ui/Badge.vue'
 import Progress from '@/components/ui/Progress.vue'
@@ -20,6 +21,7 @@ const router = useRouter()
 const config_store = useConfigStore()
 const adapter_store = useAdapterStore()
 const status_store = useStatusStore()
+const auth_store = useAuthStore()
 const toast = use_toast()
 const { status } = storeToRefs(status_store)
 const { env_values } = storeToRefs(config_store)
@@ -81,6 +83,12 @@ const server_ready = computed(() => {
 const collapsed_key = 'unibot_setup_guide_collapsed'
 const collapsed = ref(localStorage.getItem(collapsed_key) === '1')
 
+/**
+ * 快速开始引导仅对管理员展示：其中「快速授权令牌」等步骤涉及管理员专属接口，
+ * 非管理员看得到却点不动，故整块引导统一隐藏。
+ */
+const is_admin = computed(() => auth_store.is_admin)
+
 function toggle_collapsed() {
   collapsed.value = !collapsed.value
   localStorage.setItem(collapsed_key, collapsed.value ? '1' : '0')
@@ -109,6 +117,7 @@ const steps = computed(() => [
     action_label_key: 'setup.setup_step_server_action',
     done: server_ready.value,
   },
+  // 整块引导仅管理员可见（见模板 v-if），故令牌步骤对所有可见者都适用
   {
     key: 'superuser',
     title_key: 'setup.setup_step_superuser_title',
@@ -150,7 +159,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <!-- 整块引导仅管理员可见：含管理员专属的令牌步骤，非管理员一律不渲染 -->
+  <div v-if="is_admin">
     <section v-if="ready && !all_done" class="setup-guide card">
       <div class="setup-head">
         <div class="setup-title">
